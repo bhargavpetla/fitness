@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getUser, createServerSupabase } from "@/lib/supabase/server";
 import { analyzeBody } from "@/lib/ai/anthropic";
+import { loadStoredMedicalDocuments } from "@/lib/medical-docs";
 
 export const runtime = "nodejs";
 export const maxDuration = 45;
@@ -42,6 +43,7 @@ export async function POST(req: Request) {
   }
 
   try {
+    const medicalDocs = await loadStoredMedicalDocuments(supabase, user.id);
     const analysis = await analyzeBody({
       age: profile?.age ?? null,
       height_cm: profile?.height_cm ?? null,
@@ -51,6 +53,7 @@ export async function POST(req: Request) {
       goal_type: body.goal_type ?? "auto",
       goal_note: body.goal_note ?? null,
       photos: body.photos ?? [],
+      medical_docs: medicalDocs,
     });
 
     await supabase.from("goals").update({ is_active: false }).eq("user_id", user.id);

@@ -14,6 +14,20 @@ import { CheckIn } from "@/components/CheckIn";
 import { CalendarView } from "@/components/CalendarView";
 import type { Profile, Goal, ExerciseConfig } from "@/lib/types";
 
+const MEDICAL_DOC_ACCEPT =
+  ".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain";
+const MAX_STORED_MEDICAL_DOCS = 4;
+const MAX_MEDICAL_DOC_BYTES = 2 * 1024 * 1024;
+const MAX_MEDICAL_DOC_TOTAL_BYTES = 3 * 1024 * 1024;
+
+type SettingsMedicalDocument = {
+  id: string;
+  file_name: string;
+  mime_type: string;
+  size_bytes: number;
+  created_at: string;
+};
+
 export default function Settings() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -24,6 +38,9 @@ export default function Settings() {
   const [checkin, setCheckin] = useState(false);
   const [calendar, setCalendar] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [medicalDocs, setMedicalDocs] = useState<SettingsMedicalDocument[]>([]);
+  const [uploadingMedicalDoc, setUploadingMedicalDoc] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   // editable fields
   const [name, setName] = useState("");
@@ -38,10 +55,16 @@ export default function Settings() {
 
   useEffect(() => {
     (async () => {
-      const [p, g, c] = await Promise.all([fetchProfile(), fetchActiveGoal(), fetchExerciseConfig()]);
+      const [p, g, c, docs] = await Promise.all([
+        fetchProfile(),
+        fetchActiveGoal(),
+        fetchExerciseConfig(),
+        fetchMedicalDocs(),
+      ]);
       setProfile(p);
       setGoal(g);
       setCfg(c);
+      setMedicalDocs(docs);
       if (p) {
         setName(p.name ?? "");
         setAge(p.age?.toString() ?? "");
@@ -56,6 +79,21 @@ export default function Settings() {
       }
     })();
   }, []);
+
+  async function fetchMedicalDocs(): Promise<SettingsMedicalDocument[]> {
+    try {
+      const res = await fetch("/api/medical-documents");
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Could not load medical documents.");
+      return json.documents ?? [];
+    } catch {
+      return [];
+    }
+  }
+
+  async function reloadMedicalDocs() {
+    setMedicalDocs(await fetchMedicalDocs());
+  }
 
   async function saveProfile() {
     setBusy(true);
@@ -103,6 +141,59 @@ export default function Settings() {
     }
   }
 
+  async function uploadMedicalDoc(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    if (!isSupportedMedicalDoc(file)) {
+      setMsg("Upload PDF, DOCX, or TXT medical documents.");
+      return;
+    }
+    if (file.size > MAX_MEDICAL_DOC_BYTES) {
+      setMsg(`${file.name} is too large. Use files under 2 MB.`);
+      return;
+    }
+    const totalBytes = medicalDocs.reduce((sum, doc) => sum + doc.size_bytes, 0) + file.size;
+    if (totalBytes > MAX_MEDICAL_DOC_TOTAL_BYTES) {
+      setMsg("Keep medical uploads under 3 MB total.");
+      return;
+    }
+
+    setUploadingMedicalDoc(true);
+    setMsg(null);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/medical-documents", { method: "POST", body: form });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Upload failed.");
+      await reloadMedicalDocs();
+      setMsg("Medical document saved.");
+    } catch (e) {
+      setMsg((e as Error).message);
+    } finally {
+      setUploadingMedicalDoc(false);
+    }
+  }
+
+  async function deleteMedicalDoc(id: string) {
+    if (!confirm("Delete this medical document? Future AI reads will no longer use it.")) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch(`/api/medical-documents/${id}`, { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Delete failed.");
+      await reloadMedicalDocs();
+      setMsg("Medical document deleted.");
+    } catch (e) {
+      setMsg((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const [signingOut, setSigningOut] = useState(false);
   async function signOut() {
     if (!confirm("Sign out? You'll need an email code to get back in.")) return;
@@ -111,6 +202,28 @@ export default function Settings() {
     await sb.auth.signOut();
     router.replace("/login");
     router.refresh();
+  }
+
+  async function deleteAccount() {
+    const typed = prompt(
+      "This permanently deletes your profile, goals, logs, photos, medical documents, and login account. Type DELETE to confirm."
+    );
+    if (typed !== "DELETE") return;
+
+    setDeletingAccount(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/account/delete", { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Could not delete account.");
+      const sb = createClient();
+      await sb.auth.signOut();
+      router.replace("/login");
+      router.refresh();
+    } catch (e) {
+      setMsg((e as Error).message);
+      setDeletingAccount(false);
+    }
   }
 
   return (
@@ -178,6 +291,60 @@ export default function Settings() {
           </button>
         </Section>
 
+        <Section title="Medical context">
+          <p className="muted" style={{ fontSize: 13 }}>
+            Saved medical PDFs or Word/TXT notes are used as safety context when you recompute goals or run check-ins.
+          </p>
+          <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+            {medicalDocs.map((doc) => (
+              <div
+                key={doc.id}
+                className="card"
+                style={{
+                  borderRadius: 12,
+                  padding: 12,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 12,
+                }}
+              >
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {doc.file_name}
+                  </div>
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    {formatBytes(doc.size_bytes)} · {new Date(doc.created_at).toLocaleDateString()}
+                  </div>
+                </div>
+                <button
+                  className="icon-btn"
+                  style={{ color: "#b42318", flex: "0 0 auto" }}
+                  disabled={busy}
+                  onClick={() => deleteMedicalDoc(doc.id)}
+                  aria-label={`Delete ${doc.file_name}`}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+          {!medicalDocs.length && (
+            <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+              No medical documents saved yet.
+            </p>
+          )}
+          {medicalDocs.length < MAX_STORED_MEDICAL_DOCS && (
+            <label className="btn btn-ghost" style={{ display: "block", textAlign: "center", marginTop: 12 }}>
+              {uploadingMedicalDoc ? "Uploading…" : "Upload medical document"}
+              <input type="file" accept={MEDICAL_DOC_ACCEPT} hidden disabled={uploadingMedicalDoc} onChange={uploadMedicalDoc} />
+            </label>
+          )}
+          <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+            PDF, DOCX, or TXT. Up to {MAX_STORED_MEDICAL_DOCS} saved files, 2 MB each, 3 MB total.
+          </p>
+        </Section>
+
         <Section title="Weekly check-in">
           <p className="muted" style={{ fontSize: 13 }}>
             Re-read weight (and optional photos) and get a proposed macro adjustment. Nothing changes unless you accept.
@@ -197,8 +364,17 @@ export default function Settings() {
             {exporting ? <span className="spinner" style={{ borderTopColor: "var(--accent)" }} /> : "Export everything (.xlsx)"}
           </button>
           <p className="muted" style={{ fontSize: 12, marginTop: 12 }}>
-            🔒 All data and photos live in your private database. Nothing is shared.
+            🔒 All data, photos, and medical documents live in your private database. Nothing is shared.
           </p>
+        </Section>
+
+        <Section title="Danger zone">
+          <p className="muted" style={{ fontSize: 13 }}>
+            Permanently delete your profile, goals, food logs, exercise logs, photos, medical documents, and login account.
+          </p>
+          <button className="btn btn-ghost" style={{ color: "#b42318" }} disabled={deletingAccount} onClick={deleteAccount}>
+            {deletingAccount ? <span className="spinner" style={{ borderTopColor: "#b42318" }} /> : "Delete my profile fully"}
+          </button>
         </Section>
 
         <button className="btn btn-ghost" style={{ color: "#b42318", marginTop: 8 }} disabled={signingOut} onClick={signOut}>
@@ -224,6 +400,28 @@ export default function Settings() {
       )}
     </div>
   );
+}
+
+function isSupportedMedicalDoc(file: File): boolean {
+  const mime = file.type || inferMedicalMime(file.name);
+  return (
+    mime === "application/pdf" ||
+    mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    mime === "text/plain"
+  );
+}
+
+function inferMedicalMime(name: string): string {
+  const lower = name.toLowerCase();
+  if (lower.endsWith(".pdf")) return "application/pdf";
+  if (lower.endsWith(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  if (lower.endsWith(".txt")) return "text/plain";
+  return "";
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

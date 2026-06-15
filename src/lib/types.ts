@@ -136,6 +136,17 @@ export interface WeighIn {
   note: string | null;
 }
 
+export interface MedicalDocument {
+  id: string;
+  user_id: string;
+  file_name: string;
+  mime_type: string;
+  size_bytes: number;
+  storage_path: string;
+  text_content: string | null;
+  created_at: string;
+}
+
 // Body analysis result (Claude) — onboarding and 7-day check-in.
 export interface BodyAnalysis {
   body_fat_estimate: string; // a range, e.g. "14-17%"

@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { serverEnv } from "@/lib/env";
+import type { PreparedMedicalDocument } from "@/lib/medical-docs";
 import type { BodyAnalysis } from "@/lib/types";
 
 // ---- Claude Sonnet 4.6: body analysis + macro target generation ----
@@ -16,6 +17,8 @@ export interface BodyAnalysisInput {
   goal_note?: string | null;
   // base64 data URLs (data:image/jpeg;base64,...) — front and optional side.
   photos?: string[];
+  // Optional onboarding-only medical context. Not persisted by the app.
+  medical_docs?: PreparedMedicalDocument[];
   // check-in extras
   checkin?: {
     prev_weight_kg: number | null;
@@ -32,6 +35,8 @@ GUARDRAILS (non-negotiable):
 - Protein target stays in a sane range, roughly 1.6 to 2.2 g per kg bodyweight.
 - Never recommend an aggressive caloric deficit. Never suggest calories below a safe floor (about 1500 for most adults; scale up for larger/active people).
 - Macros must sum sensibly to calories (protein 4 kcal/g, carbs 4 kcal/g, fat 9 kcal/g) within ~5%.
+- If uploaded medical documents mention conditions, medications, allergies, lab results, injuries, pregnancy, eating-disorder history, kidney/liver/cardiac/metabolic issues, or physician instructions, use them only as safety context for conservative fitness/nutrition planning.
+- Do not diagnose, interpret labs as medical advice, change medication guidance, or override a clinician. If the documents imply medical risk, note that the user should confirm the plan with their clinician in the rationale.
 - Be warm and concise. This is motivation and trend tracking, not diagnosis.
 `;
 
@@ -89,6 +94,19 @@ export async function analyzeBody(input: BodyAnalysisInput): Promise<BodyAnalysi
     content.push({
       type: "image",
       source: { type: "base64", media_type: match[1] as never, data: match[2] },
+    });
+  }
+  for (const doc of input.medical_docs ?? []) {
+    const context =
+      "Medical background uploaded during first-time onboarding. Use this only for safety constraints, contraindications, allergies, medications, conditions, injuries, and nutrition/exercise considerations. Do not provide diagnosis or medication advice.";
+    content.push({
+      type: "document",
+      title: doc.name,
+      context,
+      source:
+        doc.kind === "pdf"
+          ? { type: "base64", media_type: "application/pdf", data: doc.base64 }
+          : { type: "text", media_type: "text/plain", data: doc.text },
     });
   }
   content.push({

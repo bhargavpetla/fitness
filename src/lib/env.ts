@@ -4,7 +4,12 @@
 export const PUBLIC_ENV = {
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
   supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
+  siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "",
 };
+
+export function normalizeUrl(url: string): string {
+  return url.replace(/\/+$/, "");
+}
 
 export function hasSupabase(): boolean {
   return Boolean(PUBLIC_ENV.supabaseUrl && PUBLIC_ENV.supabaseAnonKey);

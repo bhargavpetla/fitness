@@ -104,6 +104,19 @@ create table if not exists public.streaks (
   total_days_logged int not null default 0
 );
 
+-- ---------- medical_documents ----------
+create table if not exists public.medical_documents (
+  id           uuid primary key default gen_random_uuid(),
+  user_id      uuid not null references auth.users(id) on delete cascade,
+  file_name    text not null,
+  mime_type    text not null,
+  size_bytes   int not null,
+  storage_path text not null,
+  text_content text,
+  created_at   timestamptz not null default now()
+);
+create index if not exists medical_documents_user_created_idx on public.medical_documents(user_id, created_at desc);
+
 -- ============================================================================
 -- Row Level Security: each user sees only their own rows.
 -- ============================================================================
@@ -114,12 +127,13 @@ alter table public.food_logs      enable row level security;
 alter table public.exercise_logs  enable row level security;
 alter table public.exercise_config enable row level security;
 alter table public.streaks        enable row level security;
+alter table public.medical_documents enable row level security;
 
 do $$
 declare t text;
 begin
   foreach t in array array[
-    'profiles','goals','weigh_ins','food_logs','exercise_logs','exercise_config','streaks'
+    'profiles','goals','weigh_ins','food_logs','exercise_logs','exercise_config','streaks','medical_documents'
   ] loop
     execute format('drop policy if exists "own rows select" on public.%I;', t);
     execute format('drop policy if exists "own rows insert" on public.%I;', t);
@@ -149,3 +163,17 @@ create policy "own photos all" on storage.objects
   for all
   using (bucket_id = 'photos' and (storage.foldername(name))[1] = auth.uid()::text)
   with check (bucket_id = 'photos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ============================================================================
+-- Storage bucket for private medical documents.
+-- Bucket is private; only the owner can read/write their own folder (user_id/...).
+-- ============================================================================
+insert into storage.buckets (id, name, public)
+values ('medical-documents', 'medical-documents', false)
+on conflict (id) do nothing;
+
+drop policy if exists "own medical documents all" on storage.objects;
+create policy "own medical documents all" on storage.objects
+  for all
+  using (bucket_id = 'medical-documents' and (storage.foldername(name))[1] = auth.uid()::text)
+  with check (bucket_id = 'medical-documents' and (storage.foldername(name))[1] = auth.uid()::text);

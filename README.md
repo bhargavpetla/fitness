@@ -39,7 +39,9 @@ npm install
 > **Email rate limit:** Supabase's built-in email sender is capped (~3-4/hour) on the free tier. For real multi-user traffic, add a custom SMTP provider under **Auth → Settings → SMTP** (e.g. Resend, SendGrid) to lift the cap.
 
 ### 3. Create the database
-In the Supabase dashboard → **SQL Editor** → paste the contents of [`supabase/schema.sql`](supabase/schema.sql) → **Run**. This creates all tables, row-level security (each row locked to its owner), and the private `photos` storage bucket.
+In the Supabase dashboard → **SQL Editor** → paste the contents of [`supabase/schema.sql`](supabase/schema.sql) → **Run**. This creates all tables, row-level security (each row locked to its owner), and the private `photos` and `medical-documents` storage buckets.
+
+After pulling schema changes, run the same SQL again. It uses `if not exists` and safe policy replacement, so it can add new tables/buckets without wiping data.
 
 ### 4. Run
 ```bash
@@ -50,7 +52,18 @@ Open http://localhost:3000, enter your allow-listed email, type the 6-digit code
 ## Deploy (Vercel)
 1. Push to a Git repo, import into Vercel.
 2. Add every variable from `.env` to **Vercel → Settings → Environment Variables**.
-3. Deploy. In Supabase **Auth → URL Configuration**, add your Vercel URL to the redirect allow-list.
+3. Set `NEXT_PUBLIC_SITE_URL` in Vercel to your production URL, for example:
+   ```
+   NEXT_PUBLIC_SITE_URL=https://fitness-eta-lovat.vercel.app
+   ```
+4. In Supabase **Auth → URL Configuration**:
+   - Set **Site URL** to `https://fitness-eta-lovat.vercel.app`
+   - Add these **Redirect URLs**:
+     ```
+     https://fitness-eta-lovat.vercel.app/auth/callback
+     http://localhost:3000/auth/callback
+     ```
+5. Deploy again after changing the Vercel environment variable.
 
 ## Install on iPhone
 Open the deployed URL in Safari → Share → **Add to Home Screen**. It opens full-screen and stays logged in until you sign out.
@@ -59,6 +72,7 @@ Open the deployed URL in Safari → Share → **Add to Home Screen**. It opens f
 - ⚠️ The API keys originally committed to `.env` should be **rotated** before any public deploy — they were exposed during the build session.
 - `.env` is gitignored. Never commit it.
 - The allow-list (`ALLOWED_EMAIL`) means anyone with the link only ever sees the login screen.
+- Settings includes a full profile deletion action. It removes private storage files first, then deletes the Supabase auth user so database rows cascade.
 
 ## Build order map (from the spec)
 | Phase | What | Where |

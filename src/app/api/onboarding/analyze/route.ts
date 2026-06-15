@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { getUser, createServerSupabase } from "@/lib/supabase/server";
 import { analyzeBody } from "@/lib/ai/anthropic";
+import {
+  prepareMedicalDocumentUploads,
+  storeMedicalDocumentUploads,
+  type UploadedMedicalDocument,
+} from "@/lib/medical-docs";
 
 export const runtime = "nodejs";
 export const maxDuration = 45;
@@ -25,6 +30,7 @@ export async function POST(req: Request) {
     goal_type?: string;
     goal_note?: string;
     photos?: string[];
+    medical_docs?: UploadedMedicalDocument[];
   };
   try {
     body = await req.json();
@@ -36,6 +42,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Weight is required." }, { status: 400 });
   }
 
+  let medicalUploads;
+  try {
+    medicalUploads = prepareMedicalDocumentUploads(body.medical_docs ?? []);
+  } catch (e) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 400 });
+  }
+
+  const supabase = await createServerSupabase();
   let analysis;
   try {
     analysis = await analyzeBody({
@@ -49,13 +63,12 @@ export async function POST(req: Request) {
       goal_type: body.goal_type ?? "auto",
       goal_note: body.goal_note ?? null,
       photos: body.photos ?? [],
+      medical_docs: medicalUploads.map((doc) => doc.modelDocument),
     });
   } catch (e) {
     console.error("onboarding/analyze failed:", e);
     return NextResponse.json({ error: "Analysis failed. Try again." }, { status: 502 });
   }
-
-  const supabase = await createServerSupabase();
 
   // Upsert profile and mark onboarded.
   const { error: pErr } = await supabase.from("profiles").upsert({
@@ -79,6 +92,13 @@ export async function POST(req: Request) {
 
   // Record the starting weigh-in.
   await supabase.from("weigh_ins").insert({ user_id: user.id, weight_kg: body.weight_kg });
+  if (medicalUploads.length) {
+    try {
+      await storeMedicalDocumentUploads(supabase, user.id, medicalUploads);
+    } catch (e) {
+      console.error("medical document save failed:", e);
+    }
+  }
 
   // Return the analysis for the user to review/edit. The goal is written by
   // /api/onboarding/save-goal once they confirm — so they can tweak the numbers.
