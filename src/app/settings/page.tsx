@@ -8,6 +8,7 @@ import {
   fetchActiveGoal,
   fetchExerciseConfig,
   saveExerciseConfig,
+  clearEndGoal,
 } from "@/lib/db";
 import { exportEverything } from "@/lib/export";
 import { CheckIn } from "@/components/CheckIn";
@@ -53,6 +54,19 @@ export default function Settings() {
   const [split, setSplit] = useState("");
   const [cardio, setCardio] = useState("");
 
+  // manual daily-target editing
+  const [editCalories, setEditCalories] = useState("");
+  const [editProtein, setEditProtein] = useState("");
+  const [editCarbs, setEditCarbs] = useState("");
+  const [editFat, setEditFat] = useState("");
+  const [savingTarget, setSavingTarget] = useState(false);
+  const [latestWeight, setLatestWeight] = useState<number | null>(null);
+
+  // optional end goal (AI sets the timeframe)
+  const [endGoalText, setEndGoalText] = useState("");
+  const [savingEndGoal, setSavingEndGoal] = useState(false);
+  const [endGoalEta, setEndGoalEta] = useState<{ rationale: string; estimated_days: number; target_date: string } | null>(null);
+
   useEffect(() => {
     (async () => {
       const [p, g, c, docs] = await Promise.all([
@@ -65,13 +79,41 @@ export default function Settings() {
       setGoal(g);
       setCfg(c);
       setMedicalDocs(docs);
+
+      // Latest weigh-in drives the protein-per-kg hint and prefills the recompute weight.
+      const sb = createClient();
+      const { data: u } = await sb.auth.getUser();
+      if (u.user) {
+        const { data: w } = await sb
+          .from("weigh_ins")
+          .select("weight_kg")
+          .eq("user_id", u.user.id)
+          .order("date", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (w?.weight_kg != null) {
+          setLatestWeight(Number(w.weight_kg));
+          setWeightKg(String(w.weight_kg));
+        }
+      }
       if (p) {
         setName(p.name ?? "");
         setAge(p.age?.toString() ?? "");
         setHeightCm(p.height_cm?.toString() ?? "");
         setBuildNote(p.build_note ?? "");
+        setEndGoalText(p.end_goal ?? "");
+        if (p.end_goal && p.end_goal_target_date) {
+          const days = Math.max(0, Math.round((new Date(p.end_goal_target_date).getTime() - Date.now()) / 86_400_000));
+          setEndGoalEta({ rationale: "", estimated_days: days, target_date: p.end_goal_target_date });
+        }
       }
-      if (g) setGoalType(g.goal_type);
+      if (g) {
+        setGoalType(g.goal_type);
+        setEditCalories(Math.round(Number(g.calories)).toString());
+        setEditProtein(Math.round(Number(g.protein_g)).toString());
+        setEditCarbs(Math.round(Number(g.carbs_g)).toString());
+        setEditFat(Math.round(Number(g.fat_g)).toString());
+      }
       if (c) {
         setWeeklyTarget(c.weekly_target_sessions?.toString() ?? "4");
         setSplit(c.split_pattern ?? "");
@@ -138,6 +180,79 @@ export default function Settings() {
       setMsg((e as Error).message);
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function saveManualTarget() {
+    setSavingTarget(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/goals/manual", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          calories: Number(editCalories),
+          protein_g: Number(editProtein),
+          carbs_g: Number(editCarbs),
+          fat_g: Number(editFat),
+          goal_type: goalType === "auto" ? undefined : goalType,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Could not save target.");
+      setGoal(await fetchActiveGoal());
+      setMsg("Daily target updated. History untouched.");
+    } catch (e) {
+      setMsg((e as Error).message);
+    } finally {
+      setSavingTarget(false);
+    }
+  }
+
+  async function saveEndGoalText() {
+    if (!endGoalText.trim()) {
+      setMsg("Describe the goal you want to reach.");
+      return;
+    }
+    setSavingEndGoal(true);
+    setMsg(null);
+    try {
+      const res = await fetch("/api/goals/end-goal", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ end_goal: endGoalText.trim() }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Could not save goal.");
+      setEndGoalEta({ rationale: json.rationale, estimated_days: json.estimated_days, target_date: json.target_date });
+      // The AI recomputed macros for this goal — refresh the displayed target and editor.
+      const fresh = await fetchActiveGoal();
+      setGoal(fresh);
+      if (fresh) {
+        setEditCalories(Math.round(Number(fresh.calories)).toString());
+        setEditProtein(Math.round(Number(fresh.protein_g)).toString());
+        setEditCarbs(Math.round(Number(fresh.carbs_g)).toString());
+        setEditFat(Math.round(Number(fresh.fat_g)).toString());
+      }
+      setMsg("Goal saved. Macros recalculated — your countdown is on the home screen.");
+    } catch (e) {
+      setMsg((e as Error).message);
+    } finally {
+      setSavingEndGoal(false);
+    }
+  }
+
+  async function removeEndGoal() {
+    if (!confirm("Remove your end goal and its countdown?")) return;
+    setSavingEndGoal(true);
+    setMsg(null);
+    try {
+      await clearEndGoal();
+      setEndGoalText("");
+      setEndGoalEta(null);
+      setMsg("End goal removed.");
+    } finally {
+      setSavingEndGoal(false);
     }
   }
 
@@ -247,6 +362,74 @@ export default function Settings() {
             {goal.body_fat_estimate && <p className="muted" style={{ fontSize: 12 }}>Body fat est. {goal.body_fat_estimate}</p>}
           </div>
         )}
+
+        <Section title="End goal (optional)">
+          <p className="muted" style={{ fontSize: 13 }}>
+            Describe the body you want to reach — a goal weight for weight loss, a target body-fat % for recomp, anything. The AI recalculates your macros for that goal and picks a healthy, efficient timeframe. A countdown then appears on your home screen and adjusts to how consistently you hit your targets.
+          </p>
+          <textarea
+            className="field"
+            rows={2}
+            value={endGoalText}
+            onChange={(e) => setEndGoalText(e.target.value)}
+            placeholder="e.g. lose 4 kg / reach 12-14% body fat with visible abs"
+          />
+          {endGoalEta && (
+            <div className="card" style={{ marginTop: 10, background: "var(--accent-soft)", borderColor: "var(--accent)" }}>
+              <div className="meal" style={{ fontSize: 14 }}>
+                🎯 Healthy timeframe: ~{endGoalEta.estimated_days} days
+              </div>
+              <p className="muted" style={{ fontSize: 12, margin: "4px 0 0" }}>
+                Target around {new Date(endGoalEta.target_date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}.
+                {endGoalEta.rationale ? ` ${endGoalEta.rationale}` : ""}
+              </p>
+            </div>
+          )}
+          <div className="row" style={{ marginTop: 12 }}>
+            {endGoalEta && (
+              <button className="btn btn-ghost" disabled={savingEndGoal} onClick={removeEndGoal}>
+                Remove
+              </button>
+            )}
+            <button className="btn btn-primary" disabled={savingEndGoal} onClick={saveEndGoalText}>
+              {savingEndGoal ? <span className="spinner" /> : endGoalEta ? "Update goal" : "Set goal & recalc macros"}
+            </button>
+          </div>
+        </Section>
+
+        <Section title="Edit daily target">
+          <p className="muted" style={{ fontSize: 13 }}>
+            Set your own calories and macros directly. Saved as your new active target — takes effect now, all history stays exactly as logged.
+          </p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div>
+              <label className="label">Calories</label>
+              <input className="field" type="number" inputMode="numeric" value={editCalories} onChange={(e) => setEditCalories(e.target.value)} placeholder="2300" />
+            </div>
+            <div>
+              <label className="label">Protein (g)</label>
+              <input className="field" type="number" inputMode="numeric" value={editProtein} onChange={(e) => setEditProtein(e.target.value)} placeholder="120" />
+            </div>
+            <div>
+              <label className="label">Carbs (g)</label>
+              <input className="field" type="number" inputMode="numeric" value={editCarbs} onChange={(e) => setEditCarbs(e.target.value)} placeholder="270" />
+            </div>
+            <div>
+              <label className="label">Fat (g)</label>
+              <input className="field" type="number" inputMode="numeric" value={editFat} onChange={(e) => setEditFat(e.target.value)} placeholder="60" />
+            </div>
+          </div>
+          <MacroHint
+            weightKg={latestWeight}
+            calories={Number(editCalories)}
+            protein={Number(editProtein)}
+            carbs={Number(editCarbs)}
+            fat={Number(editFat)}
+          />
+          <button className="btn btn-primary" style={{ marginTop: 12 }} disabled={savingTarget} onClick={saveManualTarget}>
+            {savingTarget ? <span className="spinner" /> : "Save daily target"}
+          </button>
+        </Section>
 
         <Section title="Profile">
           <label className="label">Name</label>
@@ -422,6 +605,48 @@ function inferMedicalMime(name: string): string {
 function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// Live sanity check under the manual macro editor: shows protein g/kg (flagging
+// values above ~2 g/kg as high) and whether the macros add up to the calories
+// (protein/carbs 4 kcal/g, fat 9 kcal/g).
+function MacroHint({
+  weightKg,
+  calories,
+  protein,
+  carbs,
+  fat,
+}: {
+  weightKg: number | null;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+}) {
+  if (![calories, protein, carbs, fat].every(Number.isFinite)) return null;
+
+  const macroCalories = protein * 4 + carbs * 4 + fat * 9;
+  const diff = Math.round(macroCalories - calories);
+  const perKg = weightKg && weightKg > 0 ? protein / weightKg : null;
+  const proteinHigh = perKg != null && perKg > 2.0;
+  const macrosOff = calories > 0 && Math.abs(diff) > Math.max(80, calories * 0.07);
+
+  return (
+    <div style={{ marginTop: 8, fontSize: 12.5, lineHeight: 1.5 }}>
+      {perKg != null && (
+        <p className="muted" style={{ margin: 0, color: proteinHigh ? "#b42318" : undefined }}>
+          Protein: {perKg.toFixed(1)} g/kg
+          {proteinHigh ? " — that's high; ~1.6–2.0 g/kg is plenty for most." : " (healthy range ~1.6–2.0 g/kg)."}
+        </p>
+      )}
+      {calories > 0 && (
+        <p className="muted" style={{ margin: "2px 0 0", color: macrosOff ? "#b42318" : undefined }}>
+          Macros ≈ {Math.round(macroCalories).toLocaleString()} kcal
+          {macrosOff ? ` (${diff > 0 ? "+" : ""}${diff} vs your calorie number — they don't add up).` : " — adds up to your calorie target. ✓"}
+        </p>
+      )}
+    </div>
+  );
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {

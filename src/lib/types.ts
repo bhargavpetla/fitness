@@ -22,6 +22,9 @@ export interface Profile {
   unit_pref: UnitPref;
   onboarded: boolean;
   start_date: string;
+  end_goal: string | null;
+  end_goal_target_date: string | null;
+  end_goal_set_at: string | null;
   created_at: string;
 }
 

@@ -39,6 +39,41 @@ export async function fetchFoodLogs(date: string): Promise<FoodLog[]> {
   return (data as FoodLog[]) ?? [];
 }
 
+// Per-day calorie + protein totals over a date range (inclusive), summed across
+// all of a day's meals. Powers the goal-progress "days to goal" estimate, which
+// counts days the user actually hit their targets.
+export async function fetchDailyTotals(
+  fromDate: string,
+  toDate: string
+): Promise<Array<{ date: string; calories: number; protein_g: number }>> {
+  const sb = createClient();
+  const { data } = await sb
+    .from("food_logs")
+    .select("date, calories, protein_g")
+    .gte("date", fromDate)
+    .lte("date", toDate);
+  const byDay = new Map<string, { date: string; calories: number; protein_g: number }>();
+  for (const row of data ?? []) {
+    const d = byDay.get(row.date) ?? { date: row.date, calories: 0, protein_g: 0 };
+    d.calories += Number(row.calories);
+    d.protein_g += Number(row.protein_g);
+    byDay.set(row.date, d);
+  }
+  return Array.from(byDay.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// Clears the end goal entirely. Setting/estimating a goal goes through the
+// /api/goals/end-goal route, which also asks the AI for a healthy target date.
+export async function clearEndGoal(): Promise<void> {
+  const sb = createClient();
+  const { data: u } = await sb.auth.getUser();
+  if (!u.user) return;
+  await sb
+    .from("profiles")
+    .update({ end_goal: null, end_goal_target_date: null, end_goal_set_at: null })
+    .eq("user_id", u.user.id);
+}
+
 export async function addFoodLog(input: {
   date: string;
   meal_label: string;

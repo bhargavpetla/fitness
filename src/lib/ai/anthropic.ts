@@ -32,7 +32,9 @@ export interface BodyAnalysisInput {
 const GUARDRAILS = `
 GUARDRAILS (non-negotiable):
 - Body fat is an ESTIMATE from limited inputs, presented as a RANGE (e.g. "14-17%"), never a single false-precision number, never framed as a medical/clinical reading.
-- Protein target stays in a sane range, roughly 1.6 to 2.2 g per kg bodyweight.
+- Protein target: aim for 1.6 to 2.0 g per kg bodyweight. Treat 2.0 g/kg as a HARD CEILING — never exceed double the person's bodyweight in grams of protein (e.g. a 63.5 kg person gets at most ~127 g, ideally ~100-115 g). Higher protein is wasteful and unrealistic to eat; do not pad it.
+- DIET CONTEXT: assume an Indian/South-Asian diet unless the inputs say otherwise. Indian meals are predominantly carbohydrate-based (rice, roti, dal, idli, dosa, poha). Set carbohydrates as the LARGEST macro — roughly 45-55% of calories — and keep protein realistic for vegetarian-leaning Indian eating. Do NOT prescribe a Western high-protein/low-carb split.
+- Calorie split guide for an Indian diet: ~45-55% carbs, ~20-25% protein (within the g/kg cap above), ~25-30% fat. Carbs in grams should clearly exceed protein in grams.
 - Never recommend an aggressive caloric deficit. Never suggest calories below a safe floor (about 1500 for most adults; scale up for larger/active people).
 - Macros must sum sensibly to calories (protein 4 kcal/g, carbs 4 kcal/g, fat 9 kcal/g) within ~5%.
 - If uploaded medical documents mention conditions, medications, allergies, lab results, injuries, pregnancy, eating-disorder history, kidney/liver/cardiac/metabolic issues, or physician instructions, use them only as safety context for conservative fitness/nutrition planning.
@@ -189,6 +191,60 @@ export async function progressSummary(input: ProgressInput): Promise<string> {
     .map((b) => b.text)
     .join("")
     .trim();
+}
+
+// Estimates a healthy, realistic timeframe (in days) for a user's free-text body
+// goal, given their stats and current macro target. The AI decides the date — the
+// user never picks it — favouring the safest pace that still makes steady progress.
+export interface GoalTimeframeInput {
+  end_goal: string;
+  age: number | null;
+  height_cm: number | null;
+  sex: string | null;
+  build_note: string | null;
+  goal_type: string;
+  body_fat_estimate: string | null;
+  calories: number;
+  protein_g: number;
+}
+
+export interface GoalTimeframe {
+  estimated_days: number; // healthy realistic horizon
+  rationale: string; // one short, warm sentence
+}
+
+export async function estimateGoalTimeframe(input: GoalTimeframeInput): Promise<GoalTimeframe> {
+  const env = serverEnv();
+  const client = new Anthropic({ apiKey: env.anthropicKey });
+
+  const facts = [
+    `User's stated goal: "${input.end_goal}"`,
+    `Age: ${input.age ?? "unknown"}`,
+    `Height: ${input.height_cm ? input.height_cm + " cm" : "unknown"}`,
+    `Sex/build: ${input.sex ?? "unspecified"}${input.build_note ? " — " + input.build_note : ""}`,
+    `Programme type: ${input.goal_type}`,
+    `Current body-fat estimate: ${input.body_fat_estimate ?? "unknown"}`,
+    `Daily target: ${input.calories} kcal, ${input.protein_g} g protein`,
+  ].join("\n");
+
+  const msg = await client.messages.create({
+    model: env.anthropicModel,
+    max_tokens: 300,
+    system:
+      "You are a careful fitness coach. Given someone's body goal and stats, estimate the SHORTEST timeframe that is still HEALTHY and SUSTAINABLE to reach it — never crash diets, never unsafe rates. " +
+      "Use evidence-based rates: fat loss ~0.5-0.75 kg/week, muscle/recomp changes are slow (visible change over 8-16 weeks). " +
+      "Assume the person trains and stays consistent. If the goal is vague, assume a sensible interpretation. " +
+      'Return STRICT JSON only: {"estimated_days": <integer 21-365>, "rationale": "<one short, warm, encouraging sentence naming the healthy pace>"}',
+    messages: [{ role: "user", content: facts }],
+  });
+
+  const text = msg.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("");
+  const raw = JSON.parse(extractJson(text));
+  const days = Math.max(21, Math.min(365, Math.round(Number(raw.estimated_days) || 84)));
+  return { estimated_days: days, rationale: String(raw.rationale ?? "A steady, healthy pace.") };
 }
 
 // Pulls a JSON object out of a model reply, tolerating code fences and any

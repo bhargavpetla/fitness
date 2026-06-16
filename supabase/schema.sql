@@ -20,8 +20,16 @@ create table if not exists public.profiles (
   unit_pref    text not null default 'metric', -- 'metric' | 'imperial'
   onboarded    boolean not null default false,
   start_date   date not null default current_date, -- day 1, drives the day counter
+  end_goal              text,  -- optional free-text target body/goal, set in Settings
+  end_goal_target_date  date,  -- optional date the user wants to reach it by
+  end_goal_set_at       date,  -- day 0 for the progress window (when the goal was set)
   created_at   timestamptz not null default now()
 );
+
+-- Backfill the end-goal columns for existing profiles (idempotent).
+alter table public.profiles add column if not exists end_goal             text;
+alter table public.profiles add column if not exists end_goal_target_date date;
+alter table public.profiles add column if not exists end_goal_set_at       date;
 
 -- ---------- goals (versioned, never overwritten) ----------
 create table if not exists public.goals (
