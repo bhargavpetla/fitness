@@ -15,6 +15,9 @@ next-env.d.ts
 .DS_Store
 *.pem
 
+# raw screenshot source (curated copies live in docs/screenshots)
+/ss
+
 # debug
 npm-debug.log*
 
