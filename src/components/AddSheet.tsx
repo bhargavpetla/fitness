@@ -53,18 +53,18 @@ export function AddSheet({
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ raw_input: text, photo }),
         });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error ?? "Could not analyze.");
-        setFood(json as FoodParseResult);
+        const json = await readJsonSafe(res);
+        if (!res.ok) throw new Error(json?.error ?? "Could not analyze. Try rephrasing.");
+        setFood(json as unknown as FoodParseResult);
       } else {
         const res = await fetch("/api/exercise/parse", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ raw_input: text }),
         });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error ?? "Could not parse.");
-        setExercise(json as ParsedExercise);
+        const json = await readJsonSafe(res);
+        if (!res.ok) throw new Error(json?.error ?? "Could not parse. Try rephrasing.");
+        setExercise(json as unknown as ParsedExercise);
       }
     } catch (e) {
       setError((e as Error).message);
@@ -228,6 +228,20 @@ export function AddSheet({
       </div>
     </>
   );
+}
+
+// Reads a response body as JSON without throwing on non-JSON (e.g. a gateway
+// timeout HTML page). Returns null on parse failure so callers can fall back to
+// a friendly message instead of the cryptic native "string did not match the
+// expected pattern" error from a failed JSON.parse.
+async function readJsonSafe(res: Response): Promise<{ error?: string } & Record<string, unknown> | null> {
+  const body = await res.text();
+  if (!body) return null;
+  try {
+    return JSON.parse(body);
+  } catch {
+    return null;
+  }
 }
 
 function r(n: number) {

@@ -191,12 +191,35 @@ export async function progressSummary(input: ProgressInput): Promise<string> {
     .trim();
 }
 
-// Pulls the first JSON object out of a model reply, tolerating code fences.
+// Pulls a JSON object out of a model reply, tolerating code fences and any
+// surrounding prose (e.g. Google Search grounding text appended around the JSON,
+// which can itself contain `{` or `}` and break a naive first-brace/last-brace
+// slice). Scans for the first balanced `{...}` object, respecting string
+// literals and escapes so braces inside strings don't throw off the depth count.
 export function extractJson(text: string): string {
   const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(text);
   const body = fenced ? fenced[1] : text;
+
   const start = body.indexOf("{");
-  const end = body.lastIndexOf("}");
-  if (start === -1 || end === -1) throw new Error("No JSON found in model response");
-  return body.slice(start, end + 1);
+  if (start === -1) throw new Error("No JSON found in model response");
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let i = start; i < body.length; i++) {
+    const ch = body[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') inString = true;
+    else if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) return body.slice(start, i + 1);
+    }
+  }
+  throw new Error("No complete JSON object found in model response");
 }

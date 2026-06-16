@@ -46,19 +46,37 @@ function partsWithPhoto(text: string, photo?: string) {
 export async function parseFood(rawInput: string, photo?: string): Promise<FoodParseResult> {
   const env = serverEnv();
   const ai = genai();
+  const parts = partsWithPhoto(rawInput || "(photo only, identify the meal)", photo);
+
+  // Primary attempt: Google Search grounding for accurate macros. Grounding can
+  // make the model wrap the JSON in prose, so parsing is best-effort here.
+  try {
+    const res = await ai.models.generateContent({
+      model: env.geminiFoodModel,
+      contents: [{ role: "user", parts }],
+      config: {
+        systemInstruction: FOOD_SYSTEM,
+        tools: [{ googleSearch: {} }],
+        temperature: 0.2,
+      },
+    });
+    return normalizeFood(JSON.parse(extractJson(res.text ?? "")) as FoodParseResult);
+  } catch (e) {
+    console.warn("parseFood grounded attempt failed, retrying with JSON mode:", e);
+  }
+
+  // Fallback: no grounding, force a JSON response. Less precise macros, but
+  // reliably parseable so the user always gets a usable estimate.
   const res = await ai.models.generateContent({
     model: env.geminiFoodModel,
-    contents: [{ role: "user", parts: partsWithPhoto(rawInput || "(photo only, identify the meal)", photo) }],
+    contents: [{ role: "user", parts }],
     config: {
       systemInstruction: FOOD_SYSTEM,
-      // Google Search grounding — "look up the real macros".
-      tools: [{ googleSearch: {} }],
+      responseMimeType: "application/json",
       temperature: 0.2,
     },
   });
-
-  const parsed = JSON.parse(extractJson(res.text ?? "")) as FoodParseResult;
-  return normalizeFood(parsed);
+  return normalizeFood(JSON.parse(extractJson(res.text ?? "")) as FoodParseResult);
 }
 
 function num(v: unknown): number {
