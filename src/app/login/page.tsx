@@ -2,7 +2,7 @@
 
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { PUBLIC_ENV, normalizeUrl } from "@/lib/env";
+import { normalizeUrl } from "@/lib/env";
 import { createClient } from "@/lib/supabase/client";
 
 function LoginInner() {
@@ -16,7 +16,7 @@ function LoginInner() {
     setBusy(true);
     setError(null);
     const supabase = createClient();
-    const appUrl = normalizeUrl(PUBLIC_ENV.siteUrl || window.location.origin);
+    const appUrl = normalizeUrl(window.location.origin);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
