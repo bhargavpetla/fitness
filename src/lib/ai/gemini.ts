@@ -48,8 +48,11 @@ export async function parseFood(rawInput: string, photo?: string): Promise<FoodP
   const ai = genai();
   const parts = partsWithPhoto(rawInput || "(photo only, identify the meal)", photo);
 
-  // Primary attempt: Google Search grounding for accurate macros. Grounding can
-  // make the model wrap the JSON in prose, so parsing is best-effort here.
+  // Primary attempt: Google Search grounding for accurate macros. Thinking is
+  // disabled — it tripled latency (≈28s → ≈6s) without improving macro accuracy,
+  // and the extra time was pushing the request past the serverless timeout, which
+  // is what produced "Could not analyze". Grounding can still wrap the JSON in
+  // prose, so parsing is best-effort here.
   try {
     const res = await ai.models.generateContent({
       model: env.geminiFoodModel,
@@ -58,6 +61,7 @@ export async function parseFood(rawInput: string, photo?: string): Promise<FoodP
         systemInstruction: FOOD_SYSTEM,
         tools: [{ googleSearch: {} }],
         temperature: 0.2,
+        thinkingConfig: { thinkingBudget: 0 },
       },
     });
     return normalizeFood(JSON.parse(extractJson(res.text ?? "")) as FoodParseResult);
@@ -74,6 +78,7 @@ export async function parseFood(rawInput: string, photo?: string): Promise<FoodP
       systemInstruction: FOOD_SYSTEM,
       responseMimeType: "application/json",
       temperature: 0.2,
+      thinkingConfig: { thinkingBudget: 0 },
     },
   });
   return normalizeFood(JSON.parse(extractJson(res.text ?? "")) as FoodParseResult);
@@ -128,7 +133,12 @@ export async function parseExercise(rawInput: string): Promise<ParsedExercise> {
   const res = await ai.models.generateContent({
     model: env.geminiExerciseModel,
     contents: [{ role: "user", parts: [{ text: rawInput }] }],
-    config: { systemInstruction: EXERCISE_SYSTEM, temperature: 0.1 },
+    config: {
+      systemInstruction: EXERCISE_SYSTEM,
+      responseMimeType: "application/json",
+      temperature: 0.1,
+      thinkingConfig: { thinkingBudget: 0 },
+    },
   });
 
   const raw = JSON.parse(extractJson(res.text ?? "")) as ParsedExercise;
@@ -229,7 +239,12 @@ export async function askGuru(
   const res = await ai.models.generateContent({
     model: env.geminiFoodModel,
     contents,
-    config: { systemInstruction: system, tools: [{ googleSearch: {} }], temperature: 0.5 },
+    config: {
+      systemInstruction: system,
+      tools: [{ googleSearch: {} }],
+      temperature: 0.5,
+      thinkingConfig: { thinkingBudget: 0 },
+    },
   });
   return (res.text ?? "").trim();
 }

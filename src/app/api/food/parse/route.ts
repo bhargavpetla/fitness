@@ -3,7 +3,7 @@ import { getUser } from "@/lib/supabase/server";
 import { parseFood } from "@/lib/ai/gemini";
 
 export const runtime = "nodejs";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 // Server-only: text (+ optional base64 photo) -> Gemini grounded -> structured macros.
 export async function POST(req: Request) {

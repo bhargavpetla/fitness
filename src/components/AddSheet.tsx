@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FoodParseResult, ParsedExercise } from "@/lib/types";
 import { fileToDataUrl } from "@/lib/photos";
+import { fetchRecentFoodInputs, type RecentFoodInput } from "@/lib/db";
 
 type Mode = "food" | "exercise";
 
@@ -31,7 +32,14 @@ export function AddSheet({
   const [error, setError] = useState<string | null>(null);
   const [food, setFood] = useState<FoodParseResult | null>(null);
   const [exercise, setExercise] = useState<ParsedExercise | null>(null);
+  const [recent, setRecent] = useState<RecentFoodInput[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Load recent meals for the quick "log it again" chips (food mode only).
+  useEffect(() => {
+    if (mode !== "food") return;
+    fetchRecentFoodInputs(6).then(setRecent).catch(() => {});
+  }, [mode]);
 
   async function pickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -127,6 +135,26 @@ export function AddSheet({
               onChange={(e) => setText(e.target.value)}
               autoFocus
             />
+            {mode === "food" && !text.trim() && recent.length > 0 && (
+              <div className="recent-foods">
+                <div className="recent-foods-label">Log again</div>
+                {recent.map((r, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    className="recent-chip"
+                    title={r.raw_input}
+                    onClick={() => {
+                      setText(r.raw_input);
+                      if (r.meal_label) setMeal(r.meal_label);
+                    }}
+                  >
+                    {shorten(r.raw_input)}
+                    <span className="recent-chip-when">{relativeDay(r.date)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             {mode === "food" && (
               <>
                 <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={pickPhoto} />
@@ -242,6 +270,23 @@ async function readJsonSafe(res: Response): Promise<{ error?: string } & Record<
   } catch {
     return null;
   }
+}
+
+// First-line, length-capped preview of a logged meal for the chip label.
+function shorten(s: string): string {
+  const oneLine = s.replace(/\s+/g, " ").trim();
+  return oneLine.length > 38 ? oneLine.slice(0, 36) + "…" : oneLine;
+}
+
+// "Yesterday" / "2d ago" / a short date — keeps chips compact.
+function relativeDay(dateStr: string): string {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(dateStr + "T00:00:00");
+  const days = Math.round((today.getTime() - d.getTime()) / 86_400_000);
+  if (days <= 1) return "yesterday";
+  if (days < 7) return `${days}d ago`;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 function r(n: number) {

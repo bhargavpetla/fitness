@@ -579,6 +579,47 @@ textarea {
   line-height: 1.45;
 }
 
+/* "Log again" recent-meal chips on the add screen */
+.recent-foods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.recent-foods-label {
+  width: 100%;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.recent-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 8px 12px;
+  background: #fafafa;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.recent-chip:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.recent-chip-when {
+  font-size: 11px;
+  color: var(--ink-2);
+  flex: 0 0 auto;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation: none !important;

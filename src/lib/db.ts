@@ -39,6 +39,44 @@ export async function fetchFoodLogs(date: string): Promise<FoodLog[]> {
   return (data as FoodLog[]) ?? [];
 }
 
+export interface RecentFoodInput {
+  raw_input: string;
+  meal_label: string;
+  date: string;
+  calories: number;
+}
+
+// Recent meals the user logged, de-duplicated by their typed text, newest first.
+// Powers the "log it again" quick-pick chips on the add screen. Excludes today so
+// the suggestions are genuinely "what you ate before", and photo-only entries
+// (no typed text) since there's nothing to re-fill.
+export async function fetchRecentFoodInputs(limit = 6): Promise<RecentFoodInput[]> {
+  const sb = createClient();
+  const { data } = await sb
+    .from("food_logs")
+    .select("raw_input, meal_label, date, calories")
+    .lt("date", todayStr())
+    .order("created_at", { ascending: false })
+    .limit(40);
+  const seen = new Set<string>();
+  const out: RecentFoodInput[] = [];
+  for (const row of data ?? []) {
+    const text = (row.raw_input ?? "").trim();
+    if (!text) continue;
+    const key = text.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      raw_input: text,
+      meal_label: row.meal_label ?? "",
+      date: row.date,
+      calories: Number(row.calories) || 0,
+    });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
 // Per-day calorie + protein totals over a date range (inclusive), summed across
 // all of a day's meals. Powers the goal-progress "days to goal" estimate, which
 // counts days the user actually hit their targets.
