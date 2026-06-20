@@ -23,6 +23,7 @@ import {
   deleteExerciseLog,
 } from "@/lib/db";
 import { uploadPhoto } from "@/lib/photos";
+import { normalizeWorkout, totalVolume } from "@/lib/workout";
 import { todayStr, addDays, prettyDate, dayNumber, weekStart } from "@/lib/date";
 import { liveStreak } from "@/lib/streak";
 import { buildNudge } from "@/lib/nudges";
@@ -203,6 +204,7 @@ export function MainApp() {
             insight={insight}
             insightBusy={insightBusy}
             onInsight={loadInsight}
+            onOpen={(id) => router.push(`/workout/${id}`)}
             onDelete={async (id) => {
               await deleteExerciseLog(id);
               loadDay();
@@ -297,6 +299,7 @@ function ExerciseList({
   insight,
   insightBusy,
   onInsight,
+  onOpen,
   onDelete,
 }: {
   exercises: ExerciseLog[];
@@ -304,6 +307,7 @@ function ExerciseList({
   insight: string | null;
   insightBusy: boolean;
   onInsight: () => void;
+  onOpen: (id: string) => void;
   onDelete: (id: string) => void;
 }) {
   return (
@@ -325,21 +329,44 @@ function ExerciseList({
           {cfg?.split_pattern && <p className="muted" style={{ fontSize: 13 }}>Pattern: {cfg.split_pattern}</p>}
         </div>
       ) : (
-        exercises.map((e) => (
-          <div key={e.id} className={`card ${e.type === "rest" ? "rest" : ""}`} onClick={() => confirmDelete(e.id, onDelete)}>
-            <div className="card-top">
-              <div className="meal">{e.type === "cardio" ? "🏃 Cardio" : e.type === "rest" ? "😌 Rest day" : "Strength"}</div>
-              {e.est_calories != null && <div className="kcal">~{Math.round(Number(e.est_calories))} kcal</div>}
-            </div>
-            <div className="sub">{e.parsed_json?.summary || e.raw_input}</div>
-            {e.parsed_json?.exercises?.map((x, i) => (
-              <div key={i} className="macros-mini" style={{ justifyContent: "space-between" }}>
-                <span style={{ color: "var(--ink)" }}>{x.name}</span>
-                <span>{x.sets}×{x.reps}{x.weight_kg ? ` @ ${x.weight_kg}kg` : ""}</span>
+        exercises.map((e) => {
+          if (e.type !== "strength") {
+            return (
+              <div key={e.id} className={`card ${e.type === "rest" ? "rest" : ""}`} onClick={() => confirmDelete(e.id, onDelete)}>
+                <div className="card-top">
+                  <div className="meal">{e.type === "cardio" ? "🏃 Cardio" : e.type === "rest" ? "😌 Rest day" : "Other"}</div>
+                  {e.est_calories != null && <div className="kcal">~{Math.round(Number(e.est_calories))} kcal</div>}
+                </div>
+                <div className="sub">{e.parsed_json?.summary || e.raw_input}</div>
               </div>
-            ))}
-          </div>
-        ))
+            );
+          }
+          const ex = normalizeWorkout(e.parsed_json);
+          const vol = totalVolume(ex);
+          const groups = e.parsed_json?.muscle_groups ?? [];
+          return (
+            <div key={e.id} className="card wd-summary" onClick={() => onOpen(e.id)}>
+              <div className="card-top">
+                <div>
+                  <div className="meal">{e.parsed_json?.workout_name || "Strength"} 💪</div>
+                  {groups.length > 0 && <div className="sub">{groups.join(" · ")}</div>}
+                </div>
+                <button
+                  className="icon-btn"
+                  style={{ color: "#b42318", flex: "0 0 auto" }}
+                  onClick={(ev) => { ev.stopPropagation(); confirmDelete(e.id, onDelete); }}
+                  aria-label="Delete workout"
+                >×</button>
+              </div>
+              <div className="wd-summary-meta">
+                <span>{ex.length} exercises</span>
+                <span>{vol.toLocaleString()} kg volume</span>
+                {e.est_calories != null && <span>~{Math.round(Number(e.est_calories))} kcal</span>}
+              </div>
+              <div className="wd-summary-open">View details ›</div>
+            </div>
+          );
+        })
       )}
     </>
   );

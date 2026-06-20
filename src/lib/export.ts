@@ -3,6 +3,7 @@
 import * as XLSX from "xlsx";
 import { createClient } from "@/lib/supabase/client";
 import type { FoodLog, ExerciseLog, WeighIn, Goal } from "@/lib/types";
+import { normalizeWorkout } from "@/lib/workout";
 
 // Builds a multi-sheet workbook from all the user's logs and triggers a download.
 // Fully client-side (SheetJS). On iPhone this opens the share sheet.
@@ -61,8 +62,13 @@ export async function exportEverything() {
 
   // --- Exercise: one row per session ---
   const exRows = ((exercises as ExerciseLog[]) ?? []).map((e) => {
-    const strength = (e.parsed_json?.exercises ?? [])
-      .map((x) => `${x.name} ${x.sets}x${x.reps}${x.weight_kg ? `@${x.weight_kg}kg` : ""}${x.volume ? ` (vol ${Math.round(x.volume)})` : ""}`)
+    const strength = normalizeWorkout(e.parsed_json)
+      .map((x) => {
+        const setsStr = x.sets
+          .map((s) => `${s.weight_kg == null ? "BW" : s.weight_kg + (s.each_side ? "ea" : "")}x${s.reps}`)
+          .join(", ");
+        return `${x.name} [${setsStr}]${x.volume ? ` (vol ${Math.round(x.volume)})` : ""}`;
+      })
       .join("; ");
     const cardio = e.parsed_json?.cardio
       ? `${e.parsed_json.cardio.activity} ${e.parsed_json.cardio.duration_min ?? ""}min ${e.parsed_json.cardio.distance_km ?? ""}km`

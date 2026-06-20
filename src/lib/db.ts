@@ -173,6 +173,25 @@ export async function fetchExerciseLogs(date: string): Promise<ExerciseLog[]> {
   return (data as ExerciseLog[]) ?? [];
 }
 
+// One workout by id (RLS scopes it to the owner). Powers the detail screen.
+export async function fetchExerciseLogById(id: string): Promise<ExerciseLog | null> {
+  const sb = createClient();
+  const { data } = await sb.from("exercise_logs").select("*").eq("id", id).maybeSingle();
+  return (data as ExerciseLog) ?? null;
+}
+
+// All strength workouts, newest first — used for PRs and today-vs-last history.
+export async function fetchStrengthHistory(limit = 60): Promise<ExerciseLog[]> {
+  const sb = createClient();
+  const { data } = await sb
+    .from("exercise_logs")
+    .select("*")
+    .eq("type", "strength")
+    .order("date", { ascending: false })
+    .limit(limit);
+  return (data as ExerciseLog[]) ?? [];
+}
+
 export async function fetchWeekExerciseCount(weekStartStr: string): Promise<number> {
   const sb = createClient();
   // Count distinct non-rest days logged this week.

@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { serverEnv } from "@/lib/env";
 import { extractJson } from "@/lib/ai/anthropic";
-import type { FoodParseResult, ParsedExercise } from "@/lib/types";
+import type { FoodParseResult, ParsedExercise, ParsedStrengthExercise } from "@/lib/types";
 
 function genai() {
   return new GoogleGenAI({ apiKey: serverEnv().geminiKey });
@@ -20,16 +20,37 @@ Return JSON shaped exactly:
   "notes": [string]
 }`;
 
-const EXERCISE_SYSTEM = `You parse a plain-English workout log into structure. Return STRICT JSON only.
-For strength: each exercise with sets, reps, weight_kg (convert lb to kg if stated in lb), and volume = sets*reps*weight_kg.
-For cardio: activity, duration_min, distance_km, and a rough est_calories.
-If the input is just a rest day, set type "rest" with empty exercises.
+const EXERCISE_SYSTEM = `You are a strength coach parsing a plain-English workout log into clean structure. Return STRICT JSON only.
+
+For each strength exercise, capture EVERY set individually with its own weight and reps — do not collapse sets. If the user repeats the exercise name per set, group them under one exercise with multiple sets.
+- weight_kg: the number the user stated for that set (convert lb→kg if stated in lb).
+- each_side: true if the user said "each side"/"each"/"per side" (dumbbell loaded both sides). Otherwise false.
+- Map each exercise to its primary muscle and secondary muscles using real anatomy. Use clear muscle names like: Chest, Upper Chest, Lower Chest, Front Delts, Side Delts, Rear Delts, Triceps, Biceps, Lats, Upper Back, Traps, Quads, Hamstrings, Glutes, Calves, Core, Forearms.
+  Examples: Incline Dumbbell Press → primary "Upper Chest", secondary ["Front Delts","Triceps"]. Arnold Press → primary "Front Delts", secondary ["Side Delts","Triceps"]. Lateral Raise → primary "Side Delts". Tricep Pushdown → primary "Triceps". Bench Dips → primary "Triceps", secondary ["Lower Chest"]. Skull Crushers → primary "Triceps".
+- Fix obvious typos in exercise names ("dumbell"→"Dumbbell", "Sholder"→"Shoulder", "skill crushers"→"Skull Crushers"). Use proper Title Case.
+
+Also infer:
+- workout_name: a SHORT punchy name (1-2 words), preferring the classic training split when it fits — "Push Day" (chest/shoulders/triceps), "Pull Day" (back/biceps), "Leg Day", "Upper Body", "Full Body". Avoid long descriptive names like "Chest, Shoulders and Triceps".
+- muscle_groups: the top-level muscle groups trained, ordered by emphasis (e.g. ["Chest","Shoulders","Triceps"]).
+- est_duration_min: a reasonable estimate of session length from set count.
+- est_calories: a rough calorie burn.
+
+For cardio: activity, duration_min, distance_km, est_calories. If it's just a rest day, set type "rest" with empty exercises.
+
 Return JSON shaped exactly:
 {
   "type": "strength"|"cardio"|"rest"|"other",
-  "exercises": [{"name": string, "sets": number, "reps": number, "weight_kg": number|null, "volume": number|null}],
+  "workout_name": string,
+  "muscle_groups": [string],
+  "exercises": [{
+    "name": string,
+    "primary_muscle": string,
+    "secondary_muscles": [string],
+    "set_list": [{"weight_kg": number|null, "reps": number, "each_side": boolean}]
+  }],
   "cardio": {"activity": string, "duration_min": number|null, "distance_km": number|null}|null,
   "est_calories": number|null,
+  "est_duration_min": number|null,
   "summary": string
 }`;
 
@@ -141,25 +162,119 @@ export async function parseExercise(rawInput: string): Promise<ParsedExercise> {
     },
   });
 
-  const raw = JSON.parse(extractJson(res.text ?? "")) as ParsedExercise;
+  const raw = JSON.parse(extractJson(res.text ?? "")) as ParsedExercise & {
+    exercises?: Array<ParsedStrengthExercise & { set_list?: Array<{ weight_kg?: unknown; reps?: unknown; each_side?: unknown }> }>;
+  };
+
   const exercises = (raw.exercises ?? []).map((e) => {
-    const weight = e.weight_kg == null ? null : num(e.weight_kg);
-    const volume =
-      weight != null && e.sets && e.reps ? num(e.sets * e.reps * weight) : e.volume != null ? num(e.volume) : null;
+    // Prefer the new per-set list; fall back to legacy aggregate if present.
+    const setList = Array.isArray(e.set_list)
+      ? e.set_list.map((s) => ({
+          weight_kg: s.weight_kg == null ? null : num(s.weight_kg),
+          reps: Number(s.reps) || 0,
+          each_side: Boolean(s.each_side),
+        }))
+      : legacyToSetList(e);
+
+    // Volume = sum over sets of (effective per-rep load × reps). "each side"
+    // doubles the per-rep load since both dumbbells are loaded.
+    const volume = setList.reduce((sum, s) => {
+      const load = s.weight_kg == null ? 0 : s.weight_kg * (s.each_side ? 2 : 1);
+      return sum + load * s.reps;
+    }, 0);
+
     return {
-      name: String(e.name ?? "exercise"),
-      sets: Number(e.sets) || 0,
-      reps: Number(e.reps) || 0,
-      weight_kg: weight,
-      volume,
-    };
+      name: String(e.name ?? "Exercise"),
+      primary_muscle: e.primary_muscle ? String(e.primary_muscle) : undefined,
+      secondary_muscles: Array.isArray(e.secondary_muscles) ? e.secondary_muscles.map(String) : [],
+      set_list: setList,
+      volume: num(volume),
+    } as ParsedStrengthExercise;
   });
+
   return {
     type: (raw.type as ParsedExercise["type"]) ?? "other",
+    workout_name: raw.workout_name ? String(raw.workout_name) : undefined,
+    muscle_groups: Array.isArray(raw.muscle_groups) ? raw.muscle_groups.map(String) : [],
     exercises,
     cardio: raw.cardio ?? null,
     est_calories: raw.est_calories == null ? null : num(raw.est_calories),
+    est_duration_min: raw.est_duration_min == null ? null : num(raw.est_duration_min),
     summary: String(raw.summary ?? ""),
+  };
+}
+
+// Converts a legacy aggregate exercise ({sets, reps, weight_kg}) into a set list.
+function legacyToSetList(e: ParsedStrengthExercise) {
+  const count = Number(e.sets) || 0;
+  const reps = Number(e.reps) || 0;
+  const w = e.weight_kg == null ? null : num(e.weight_kg);
+  return Array.from({ length: count }, () => ({ weight_kg: w, reps, each_side: false }));
+}
+
+// Single-call workout intelligence: per-exercise insights + an "Explain My
+// Workout" narrative + a recovery suggestion, generated together for coherence
+// and to bill once. The caller passes a compact, already-computed summary so the
+// model reasons over facts (volumes, deltas, today's nutrition) rather than
+// re-deriving them. Cached by the route into the log so re-opens are free.
+export interface WorkoutIntelligenceInput {
+  workoutName: string;
+  muscleGroups: string[];
+  exercises: Array<{
+    name: string;
+    primaryMuscle: string;
+    volume: number;
+    sets: Array<{ weight_kg: number | null; reps: number; each_side?: boolean }>;
+    comparison?: { repDelta: number | null; weightDelta: number | null; volumeDelta: number | null; found: boolean };
+  }>;
+  totalVolume: number;
+  overloadPct: number | null;
+  nutrition?: {
+    calories_consumed: number;
+    protein_consumed: number;
+    calorie_goal: number | null;
+    protein_goal: number | null;
+  } | null;
+  name?: string | null;
+}
+
+export interface WorkoutIntelligenceResult {
+  exercise_insights: Record<string, string>;
+  narrative: string;
+  recovery: string;
+}
+
+export async function workoutIntelligence(input: WorkoutIntelligenceInput): Promise<WorkoutIntelligenceResult> {
+  const env = serverEnv();
+  const ai = genai();
+
+  const system = `You are a warm, sharp strength coach. Given a parsed workout (with per-exercise volume and today-vs-last deltas) and the user's nutrition so far today, return STRICT JSON only.
+For each exercise, write ONE short insight (max ~16 words) about consistency, progression, fatigue, or a concrete next-session cue (e.g. "Strong consistency across all sets. Next time try 13 kg or 12 reps."). Reference the deltas when present.
+Write a "narrative" ("Explain My Workout"): 2-3 short paragraphs, friendly and specific, summarizing stimulus by muscle and notable progress. No fluff, no medical claims.
+Write a "recovery" line using remaining protein/calories: suggest a concrete meal in grams (e.g. "You have 68g protein left — try 200g chicken, 180g rice, 200g curd.") If no nutrition data, give a simple protein-focused tip.
+Return JSON shaped exactly:
+{ "exercise_insights": { "<exercise name>": "<insight>" }, "narrative": "<text>", "recovery": "<text>" }`;
+
+  const res = await ai.models.generateContent({
+    model: env.geminiExerciseModel,
+    contents: [{ role: "user", parts: [{ text: JSON.stringify(input) }] }],
+    config: {
+      systemInstruction: system,
+      responseMimeType: "application/json",
+      temperature: 0.5,
+      thinkingConfig: { thinkingBudget: 0 },
+    },
+  });
+
+  const raw = JSON.parse(extractJson(res.text ?? "")) as Partial<WorkoutIntelligenceResult>;
+  const insights: Record<string, string> = {};
+  if (raw.exercise_insights && typeof raw.exercise_insights === "object") {
+    for (const [k, v] of Object.entries(raw.exercise_insights)) insights[String(k)] = String(v);
+  }
+  return {
+    exercise_insights: insights,
+    narrative: String(raw.narrative ?? ""),
+    recovery: String(raw.recovery ?? ""),
   };
 }
 

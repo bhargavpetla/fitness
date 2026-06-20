@@ -620,6 +620,103 @@ textarea {
   flex: 0 0 auto;
 }
 
+/* ===== Workout detail screen ===== */
+.content.wd { padding-bottom: 40px; }
+
+.wd-head { display: flex; align-items: center; gap: 12px; margin: 4px 0 16px; }
+.wd-head-icon {
+  width: 44px; height: 44px; border-radius: 14px;
+  display: grid; place-items: center; font-size: 22px;
+  background: var(--accent-soft); flex: 0 0 auto;
+}
+.wd-title { margin: 0; font-size: 22px; letter-spacing: -0.02em; }
+.wd-sub { color: var(--ink-2); font-size: 13px; margin-top: 2px; }
+
+.wd-chips { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.wd-chip { background: #fff; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 10px; box-shadow: var(--shadow); }
+.wd-chip-icon { font-size: 14px; }
+.wd-chip-big { font-weight: 700; font-size: 14px; margin-top: 4px; letter-spacing: -0.01em; }
+.wd-chip-small { color: var(--ink-2); font-size: 11px; }
+
+.wd-card {
+  background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 16px; margin-bottom: 14px; box-shadow: var(--shadow);
+}
+.wd-h3 { margin: 0 0 12px; font-size: 15px; letter-spacing: -0.01em; }
+
+/* muscle focus */
+.wd-focus { display: flex; align-items: center; gap: 16px; }
+.bodymap { display: flex; gap: 4px; flex: 0 0 auto; }
+.bodymap-svg { width: 72px; height: auto; }
+.wd-focus-list { flex: 1; display: grid; gap: 9px; }
+.wd-focus-row { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.wd-dot { width: 9px; height: 9px; border-radius: 99px; flex: 0 0 auto; }
+.wd-focus-name { flex: 1; color: var(--ink); }
+.wd-focus-pct { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* performance summary */
+.wd-perf { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.wd-perf-cell { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px; background: #fcfcfc; }
+.wd-perf-icon { font-size: 15px; }
+.wd-perf-value { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin-top: 4px; }
+.wd-perf-unit { font-size: 13px; font-weight: 600; color: var(--ink-2); }
+.wd-perf-label { color: var(--ink-2); font-size: 12px; margin-top: 2px; }
+
+/* exercise cards */
+.wd-ex { border-top: 1px solid var(--line); padding: 14px 0; }
+.wd-ex:first-of-type { border-top: none; padding-top: 0; }
+.wd-ex-top { display: flex; gap: 12px; align-items: center; margin-bottom: 10px; }
+.wd-ex-thumb {
+  width: 52px; height: 52px; border-radius: 12px; flex: 0 0 auto;
+  background: var(--accent-soft); display: grid; place-items: center; overflow: hidden;
+}
+.wd-ex-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.wd-ex-thumb-ph { font-size: 22px; }
+.wd-ex-name { font-weight: 700; font-size: 15px; }
+.wd-ex-num { color: var(--ink-2); font-weight: 700; margin-right: 2px; }
+.wd-ex-muscle { color: var(--ink-2); font-size: 12px; margin-top: 1px; }
+
+.wd-sets { display: grid; gap: 6px; margin-bottom: 10px; }
+.wd-set-row { display: flex; align-items: center; font-size: 14px; }
+.wd-set-label { color: var(--accent); font-weight: 700; width: 64px; flex: 0 0 auto; }
+.wd-set-weight { flex: 1; }
+.wd-set-reps { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+
+.wd-ex-foot { display: flex; align-items: center; justify-content: space-between; }
+.wd-ex-vol { display: flex; gap: 8px; align-items: baseline; }
+.wd-ex-vol-label { color: var(--ink-2); font-size: 12px; }
+.wd-ex-vol-val { font-weight: 700; font-size: 14px; }
+.wd-improve { color: var(--accent); font-weight: 700; font-size: 13px; }
+
+.wd-insight { background: var(--accent-soft); border-radius: var(--radius-sm); padding: 10px 12px; margin-top: 10px; }
+.wd-insight-tag { color: var(--accent); font-weight: 700; font-size: 12px; }
+.wd-insight p { margin: 4px 0 0; font-size: 13px; color: var(--ink); line-height: 1.45; }
+
+/* muscle volume distribution */
+.wd-dist-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.wd-dist-name { width: 84px; flex: 0 0 auto; font-size: 13px; }
+.wd-dist-bar { flex: 1; height: 8px; background: rgba(0,0,0,0.06); border-radius: 99px; overflow: hidden; }
+.wd-dist-fill { height: 100%; border-radius: 99px; }
+.wd-dist-val { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; width: 70px; text-align: right; flex: 0 0 auto; }
+
+/* personal records */
+.wd-pr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.wd-pr { border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 12px; background: #fcfcfc; }
+.wd-pr-label { font-weight: 700; font-size: 13px; }
+.wd-pr-sub { color: var(--ink-2); font-size: 11px; margin: 2px 0; }
+.wd-pr-val { font-weight: 800; font-size: 16px; color: var(--accent); }
+
+/* AI coach */
+.wd-narrative { margin-top: 12px; font-size: 14px; line-height: 1.55; white-space: pre-wrap; color: var(--ink); }
+.wd-recovery { margin-top: 12px; background: var(--accent-soft); border-radius: var(--radius-sm); padding: 12px; }
+.wd-recovery-h { font-weight: 700; font-size: 13px; margin-bottom: 4px; }
+.wd-recovery p { margin: 0; font-size: 13px; line-height: 1.5; }
+
+/* strength summary card on the day list */
+.wd-summary { cursor: pointer; }
+.wd-summary-meta { display: flex; gap: 14px; flex-wrap: wrap; color: var(--ink-2); font-size: 13px; margin-top: 8px; }
+.wd-summary-open { color: var(--accent); font-weight: 700; font-size: 13px; margin-top: 8px; }
+
 @media (prefers-reduced-motion: reduce) {
   * {
     animation: none !important;

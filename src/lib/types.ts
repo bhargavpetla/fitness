@@ -88,20 +88,47 @@ export interface FoodLog {
 
 export type ExerciseType = "strength" | "cardio" | "rest" | "other";
 
+// One logged set. weight_kg is the number the user stated; if each_side is true
+// (dumbbell "12.5kg each side") the effective load per rep is 2× that — the
+// workout math accounts for it, the UI shows "12.5 kg each".
+export interface ExerciseSet {
+  weight_kg: number | null;
+  reps: number;
+  each_side?: boolean;
+}
+
 export interface ParsedStrengthExercise {
   name: string;
-  sets: number;
-  reps: number;
-  weight_kg: number | null;
-  volume: number | null; // sets * reps * weight
+  primary_muscle?: string;
+  secondary_muscles?: string[];
+  // Canonical per-set data for new logs.
+  set_list?: ExerciseSet[];
+  volume?: number | null;
+  // Legacy aggregate shape (older logs / fallback). Still read by the
+  // normalizer in lib/workout.ts so old entries keep rendering.
+  sets?: number;
+  reps?: number;
+  weight_kg?: number | null;
+}
+
+// AI-generated, cached once per workout so we never re-bill on re-open.
+export interface WorkoutIntelligence {
+  narrative?: string; // "Explain My Workout"
+  recovery?: string; // protein/calorie + dinner suggestion
+  exercise_insights?: Record<string, string>; // exercise name -> one-line insight
+  generated_at?: string;
 }
 
 export interface ParsedExercise {
   type: ExerciseType;
+  workout_name?: string; // e.g. "Push Day"
+  muscle_groups?: string[]; // e.g. ["Chest", "Shoulders", "Triceps"]
   exercises: ParsedStrengthExercise[]; // strength
   cardio?: { activity: string; duration_min: number | null; distance_km: number | null } | null;
   est_calories: number | null;
+  est_duration_min?: number | null;
   summary: string;
+  intelligence?: WorkoutIntelligence;
 }
 
 export interface ExerciseLog {

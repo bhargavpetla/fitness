@@ -227,14 +227,19 @@ export function AddSheet({
           <>
             <h3>Confirm workout</h3>
             <div className="card" style={{ animation: "none" }}>
-              <div className="meal" style={{ textTransform: "capitalize" }}>{exercise.type}</div>
-              {exercise.summary && <p className="sub">{exercise.summary}</p>}
-              {exercise.exercises.map((e, i) => (
-                <div key={i} className="macros-mini" style={{ justifyContent: "space-between" }}>
-                  <span style={{ color: "var(--ink)" }}>{e.name}</span>
-                  <span>{e.sets}×{e.reps}{e.weight_kg ? ` @ ${e.weight_kg}kg` : ""}{e.volume ? ` · ${Math.round(e.volume)} vol` : ""}</span>
-                </div>
-              ))}
+              <div className="meal">{exercise.workout_name || (exercise.type === "strength" ? "Strength" : exercise.type)}</div>
+              {(exercise.muscle_groups?.length ?? 0) > 0 && <p className="sub">{exercise.muscle_groups!.join(" · ")}</p>}
+              {exercise.exercises.map((e, i) => {
+                const sets = e.set_list ?? [];
+                const reps = sets.map((s) => s.reps).join("/");
+                const w = sets.find((s) => s.weight_kg != null);
+                return (
+                  <div key={i} className="macros-mini" style={{ justifyContent: "space-between" }}>
+                    <span style={{ color: "var(--ink)" }}>{e.name}</span>
+                    <span>{sets.length}×[{reps || "—"}]{w?.weight_kg != null ? ` @ ${w.weight_kg}kg${w.each_side ? " ea" : ""}` : ""}</span>
+                  </div>
+                );
+              })}
               {exercise.cardio && (
                 <div className="macros-mini">
                   <span>{exercise.cardio.activity}</span>
