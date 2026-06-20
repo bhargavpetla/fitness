@@ -67,6 +67,10 @@ export default function Settings() {
   const [savingEndGoal, setSavingEndGoal] = useState(false);
   const [endGoalEta, setEndGoalEta] = useState<{ rationale: string; estimated_days: number; target_date: string } | null>(null);
 
+  // batch exercise-image generation
+  const [imgBusy, setImgBusy] = useState(false);
+  const [imgProgress, setImgProgress] = useState<{ cached: number; total: number } | null>(null);
+
   useEffect(() => {
     (async () => {
       const [p, g, c, docs] = await Promise.all([
@@ -253,6 +257,33 @@ export default function Settings() {
       setMsg("End goal removed.");
     } finally {
       setSavingEndGoal(false);
+    }
+  }
+
+  async function generateExerciseImages() {
+    setImgBusy(true);
+    setMsg(null);
+    try {
+      // Loop the resumable batch endpoint until nothing remains. Each call
+      // generates a few images (image gen is slow) and reports progress.
+      for (let guard = 0; guard < 50; guard++) {
+        const res = await fetch("/api/exercise/images/prepare", { method: "POST" });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error ?? "Could not generate images.");
+        setImgProgress({ cached: json.cached, total: json.total });
+        if (json.total === 0) {
+          setMsg("No workouts yet — log a workout first.");
+          break;
+        }
+        if (json.remaining === 0) {
+          setMsg(`All ${json.total} exercise images ready.`);
+          break;
+        }
+      }
+    } catch (e) {
+      setMsg((e as Error).message);
+    } finally {
+      setImgBusy(false);
     }
   }
 
@@ -540,6 +571,23 @@ export default function Settings() {
             Per-day calories, macros and AI-estimated vitamins from your food entries.
           </p>
           <button className="btn btn-ghost" onClick={() => setCalendar(true)}>View calendar &amp; vitamins</button>
+        </Section>
+
+        <Section title="Exercise images">
+          <p className="muted" style={{ fontSize: 13 }}>
+            Generate illustrations for every exercise in your workout history. Each exercise is created once and reused everywhere — only brand-new exercises generate later.
+          </p>
+          {imgProgress && imgProgress.total > 0 && (
+            <div className="gc-bar" style={{ margin: "10px 0" }} aria-hidden>
+              <div className="gc-bar-fill" style={{ width: `${Math.round((imgProgress.cached / imgProgress.total) * 100)}%` }} />
+            </div>
+          )}
+          {imgProgress && imgProgress.total > 0 && (
+            <p className="muted" style={{ fontSize: 12 }}>{imgProgress.cached} / {imgProgress.total} ready</p>
+          )}
+          <button className="btn btn-ghost" disabled={imgBusy} onClick={generateExerciseImages}>
+            {imgBusy ? <span className="spinner" style={{ borderTopColor: "var(--accent)" }} /> : "Generate exercise images"}
+          </button>
         </Section>
 
         <Section title="Data">
