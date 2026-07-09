@@ -591,63 +591,19 @@ textarea {
   }
 }
 
-/* Goal countdown card (home screen) */
-.goal-countdown {
-  margin: 12px 16px 0;
-  padding: 14px 16px;
-  background: var(--accent-soft);
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-sm);
-}
-.goal-countdown.muted-card {
-  background: #fafafa;
-  border-color: var(--line);
-}
-.goal-countdown .gc-top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-.goal-countdown .gc-goal {
-  font-weight: 700;
-  font-size: 14px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.goal-countdown .gc-days {
-  font-weight: 800;
-  font-size: 14px;
-  color: var(--accent);
-  flex: 0 0 auto;
-  font-variant-numeric: tabular-nums;
-}
-.goal-countdown .gc-bar {
+/* Progress bar primitive (plan header, etc.) */
+.gc-bar {
   height: 7px;
   background: rgba(0, 0, 0, 0.06);
   border-radius: 99px;
   margin: 10px 0 6px;
   overflow: hidden;
 }
-.goal-countdown .gc-bar-fill {
+.gc-bar-fill {
   height: 100%;
   background: var(--accent);
   border-radius: 99px;
   transition: width 0.4s ease;
-}
-.goal-countdown .gc-meta {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--ink-2);
-  font-variant-numeric: tabular-nums;
-}
-.goal-countdown .gc-sub {
-  margin: 6px 0 0;
-  font-size: 12.5px;
-  color: var(--ink-2);
-  line-height: 1.45;
 }
 
 /* "Log again" recent-meal chips on the add screen */
@@ -1801,6 +1757,130 @@ textarea {
   font-weight: 600;
   margin-bottom: 12px;
   font-variant-numeric: tabular-nums;
+}
+
+/* ===== Calendar (Google-Photos-style month timeline) ===== */
+.cal {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  max-width: 520px;
+  margin: 0 auto;
+  background: var(--canvas);
+  display: flex;
+  flex-direction: column;
+  animation: slideup 0.25s var(--ease);
+  padding-top: env(safe-area-inset-top);
+}
+.cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 8px;
+  border-bottom: 1px solid var(--line);
+}
+.cal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 8px 18px 20px;
+}
+.cal-month { margin-bottom: 22px; }
+.cal-month-name {
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+  margin: 10px 0 8px;
+  position: sticky;
+  top: 0;
+  background: linear-gradient(to bottom, var(--canvas) 75%, transparent);
+  padding: 4px 0;
+  z-index: 1;
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.cal-weekdays {
+  margin-bottom: 4px;
+}
+.cal-weekdays span {
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+  letter-spacing: 0.05em;
+}
+.cal-day {
+  position: relative;
+  aspect-ratio: 1;
+  border: none;
+  background: transparent;
+  border-radius: 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  font-variant-numeric: tabular-nums;
+}
+.cal-day.logged {
+  background: linear-gradient(135deg, rgba(47, 122, 77, 0.22), rgba(126, 226, 168, 0.32));
+  box-shadow: inset 0 0 0 1px rgba(47, 122, 77, 0.18);
+}
+.cal-day.today {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.cal-day.future {
+  color: var(--ink-2);
+  opacity: 0.35;
+}
+.cal-day:active:not(.future) {
+  transform: scale(0.92);
+}
+.cal-train-dot {
+  position: absolute;
+  bottom: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--fat);
+}
+.cal-foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 18px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.cal-key {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  margin-right: 5px;
+  vertical-align: -2px;
+}
+.cal-key.logged { background: linear-gradient(135deg, rgba(47, 122, 77, 0.3), rgba(126, 226, 168, 0.45)); }
+.cal-key.train { background: var(--fat); border-radius: 50%; width: 8px; height: 8px; }
+.cal-today-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 99px;
+  padding: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink);
 }
 
 /* ===== Analytics (/analytics) — WHOOP-style, graphs first ===== */

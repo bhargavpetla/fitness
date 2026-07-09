@@ -8,11 +8,8 @@ import {
   fetchActiveGoal,
   fetchExerciseConfig,
   saveExerciseConfig,
-  clearEndGoal,
 } from "@/lib/db";
 import { exportEverything } from "@/lib/export";
-import { CheckIn } from "@/components/CheckIn";
-import { CalendarView } from "@/components/CalendarView";
 import type { Profile, Goal, ExerciseConfig } from "@/lib/types";
 
 const MEDICAL_DOC_ACCEPT =
@@ -36,8 +33,6 @@ export default function Settings() {
   const [cfg, setCfg] = useState<ExerciseConfig | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
-  const [checkin, setCheckin] = useState(false);
-  const [calendar, setCalendar] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [medicalDocs, setMedicalDocs] = useState<SettingsMedicalDocument[]>([]);
   const [uploadingMedicalDoc, setUploadingMedicalDoc] = useState(false);
@@ -61,15 +56,6 @@ export default function Settings() {
   const [editFat, setEditFat] = useState("");
   const [savingTarget, setSavingTarget] = useState(false);
   const [latestWeight, setLatestWeight] = useState<number | null>(null);
-
-  // optional end goal (AI sets the timeframe)
-  const [endGoalText, setEndGoalText] = useState("");
-  const [savingEndGoal, setSavingEndGoal] = useState(false);
-  const [endGoalEta, setEndGoalEta] = useState<{ rationale: string; estimated_days: number; target_date: string } | null>(null);
-
-  // batch exercise-image generation
-  const [imgBusy, setImgBusy] = useState(false);
-  const [imgProgress, setImgProgress] = useState<{ cached: number; total: number } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -105,11 +91,6 @@ export default function Settings() {
         setAge(p.age?.toString() ?? "");
         setHeightCm(p.height_cm?.toString() ?? "");
         setBuildNote(p.build_note ?? "");
-        setEndGoalText(p.end_goal ?? "");
-        if (p.end_goal && p.end_goal_target_date) {
-          const days = Math.max(0, Math.round((new Date(p.end_goal_target_date).getTime() - Date.now()) / 86_400_000));
-          setEndGoalEta({ rationale: "", estimated_days: days, target_date: p.end_goal_target_date });
-        }
       }
       if (g) {
         setGoalType(g.goal_type);
@@ -210,80 +191,6 @@ export default function Settings() {
       setMsg((e as Error).message);
     } finally {
       setSavingTarget(false);
-    }
-  }
-
-  async function saveEndGoalText() {
-    if (!endGoalText.trim()) {
-      setMsg("Describe the goal you want to reach.");
-      return;
-    }
-    setSavingEndGoal(true);
-    setMsg(null);
-    try {
-      const res = await fetch("/api/goals/end-goal", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ end_goal: endGoalText.trim() }),
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error ?? "Could not save goal.");
-      setEndGoalEta({ rationale: json.rationale, estimated_days: json.estimated_days, target_date: json.target_date });
-      // The AI recomputed macros for this goal — refresh the displayed target and editor.
-      const fresh = await fetchActiveGoal();
-      setGoal(fresh);
-      if (fresh) {
-        setEditCalories(Math.round(Number(fresh.calories)).toString());
-        setEditProtein(Math.round(Number(fresh.protein_g)).toString());
-        setEditCarbs(Math.round(Number(fresh.carbs_g)).toString());
-        setEditFat(Math.round(Number(fresh.fat_g)).toString());
-      }
-      setMsg("Goal saved. Macros recalculated — your countdown is on the home screen.");
-    } catch (e) {
-      setMsg((e as Error).message);
-    } finally {
-      setSavingEndGoal(false);
-    }
-  }
-
-  async function removeEndGoal() {
-    if (!confirm("Remove your end goal and its countdown?")) return;
-    setSavingEndGoal(true);
-    setMsg(null);
-    try {
-      await clearEndGoal();
-      setEndGoalText("");
-      setEndGoalEta(null);
-      setMsg("End goal removed.");
-    } finally {
-      setSavingEndGoal(false);
-    }
-  }
-
-  async function generateExerciseImages() {
-    setImgBusy(true);
-    setMsg(null);
-    try {
-      // Loop the resumable batch endpoint until nothing remains. Each call
-      // generates a few images (image gen is slow) and reports progress.
-      for (let guard = 0; guard < 50; guard++) {
-        const res = await fetch("/api/exercise/images/prepare", { method: "POST" });
-        const json = await res.json();
-        if (!res.ok) throw new Error(json.error ?? "Could not generate images.");
-        setImgProgress({ cached: json.cached, total: json.total });
-        if (json.total === 0) {
-          setMsg("No workouts yet — log a workout first.");
-          break;
-        }
-        if (json.remaining === 0) {
-          setMsg(`All ${json.total} exercise images ready.`);
-          break;
-        }
-      }
-    } catch (e) {
-      setMsg((e as Error).message);
-    } finally {
-      setImgBusy(false);
     }
   }
 
@@ -393,40 +300,6 @@ export default function Settings() {
             {goal.body_fat_estimate && <p className="muted" style={{ fontSize: 12 }}>Body fat est. {goal.body_fat_estimate}</p>}
           </div>
         )}
-
-        <Section title="End goal (optional)">
-          <p className="muted" style={{ fontSize: 13 }}>
-            Describe the body you want to reach — a goal weight for weight loss, a target body-fat % for recomp, anything. The AI recalculates your macros for that goal and picks a healthy, efficient timeframe. A countdown then appears on your home screen and adjusts to how consistently you hit your targets.
-          </p>
-          <textarea
-            className="field"
-            rows={2}
-            value={endGoalText}
-            onChange={(e) => setEndGoalText(e.target.value)}
-            placeholder="e.g. lose 4 kg / reach 12-14% body fat with visible abs"
-          />
-          {endGoalEta && (
-            <div className="card" style={{ marginTop: 10, background: "var(--accent-soft)", borderColor: "var(--accent)" }}>
-              <div className="meal" style={{ fontSize: 14 }}>
-                🎯 Healthy timeframe: ~{endGoalEta.estimated_days} days
-              </div>
-              <p className="muted" style={{ fontSize: 12, margin: "4px 0 0" }}>
-                Target around {new Date(endGoalEta.target_date).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}.
-                {endGoalEta.rationale ? ` ${endGoalEta.rationale}` : ""}
-              </p>
-            </div>
-          )}
-          <div className="row" style={{ marginTop: 12 }}>
-            {endGoalEta && (
-              <button className="btn btn-ghost" disabled={savingEndGoal} onClick={removeEndGoal}>
-                Remove
-              </button>
-            )}
-            <button className="btn btn-primary" disabled={savingEndGoal} onClick={saveEndGoalText}>
-              {savingEndGoal ? <span className="spinner" /> : endGoalEta ? "Update goal" : "Set goal & recalc macros"}
-            </button>
-          </div>
-        </Section>
 
         <Section title="Edit daily target">
           <p className="muted" style={{ fontSize: 13 }}>
@@ -559,37 +432,6 @@ export default function Settings() {
           </p>
         </Section>
 
-        <Section title="Weekly check-in">
-          <p className="muted" style={{ fontSize: 13 }}>
-            Re-read weight (and optional photos) and get a proposed macro adjustment. Nothing changes unless you accept.
-          </p>
-          <button className="btn btn-ghost" onClick={() => setCheckin(true)}>Start check-in</button>
-        </Section>
-
-        <Section title="Nutrition history">
-          <p className="muted" style={{ fontSize: 13 }}>
-            Per-day calories, macros and AI-estimated vitamins from your food entries.
-          </p>
-          <button className="btn btn-ghost" onClick={() => setCalendar(true)}>View calendar &amp; vitamins</button>
-        </Section>
-
-        <Section title="Exercise images">
-          <p className="muted" style={{ fontSize: 13 }}>
-            Generate illustrations for every exercise in your workout history. Each exercise is created once and reused everywhere — only brand-new exercises generate later.
-          </p>
-          {imgProgress && imgProgress.total > 0 && (
-            <div className="gc-bar" style={{ margin: "10px 0" }} aria-hidden>
-              <div className="gc-bar-fill" style={{ width: `${Math.round((imgProgress.cached / imgProgress.total) * 100)}%` }} />
-            </div>
-          )}
-          {imgProgress && imgProgress.total > 0 && (
-            <p className="muted" style={{ fontSize: 12 }}>{imgProgress.cached} / {imgProgress.total} ready</p>
-          )}
-          <button className="btn btn-ghost" disabled={imgBusy} onClick={generateExerciseImages}>
-            {imgBusy ? <span className="spinner" style={{ borderTopColor: "var(--accent)" }} /> : "Generate exercise images"}
-          </button>
-        </Section>
-
         <Section title="Data">
           <button className="btn btn-ghost" disabled={exporting} onClick={async () => { setExporting(true); try { await exportEverything(); } finally { setExporting(false); } }}>
             {exporting ? <span className="spinner" style={{ borderTopColor: "var(--accent)" }} /> : "Export everything (.xlsx)"}
@@ -614,21 +456,6 @@ export default function Settings() {
 
         {msg && <p style={{ textAlign: "center", color: "var(--accent)", fontSize: 14, marginTop: 12 }}>{msg}</p>}
       </div>
-
-      {checkin && (
-        <CheckIn
-          onClose={() => setCheckin(false)}
-          onApplied={async () => {
-            setCheckin(false);
-            setGoal(await fetchActiveGoal());
-            setMsg("New target applied.");
-          }}
-        />
-      )}
-
-      {calendar && (
-        <CalendarView goal={goal} onClose={() => setCalendar(false)} onPickDate={() => setCalendar(false)} />
-      )}
     </div>
   );
 }

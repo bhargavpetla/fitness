@@ -104,18 +104,6 @@ export async function fetchDailyTotals(
   return Array.from(byDay.values()).sort((a, b) => a.date.localeCompare(b.date));
 }
 
-// Clears the end goal entirely. Setting/estimating a goal goes through the
-// /api/goals/end-goal route, which also asks the AI for a healthy target date.
-export async function clearEndGoal(): Promise<void> {
-  const sb = createClient();
-  const { data: u } = await sb.auth.getUser();
-  if (!u.user) return;
-  await sb
-    .from("profiles")
-    .update({ end_goal: null, end_goal_target_date: null, end_goal_set_at: null })
-    .eq("user_id", u.user.id);
-}
-
 export async function addFoodLog(input: {
   date: string;
   meal_label: string;

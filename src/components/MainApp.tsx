@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TopCounter } from "./TopCounter";
-import { GoalCountdown } from "./GoalCountdown";
 import { AddSheet } from "./AddSheet";
 import { Toast } from "./Toast";
 import { EntryCard } from "./EntryCard";
@@ -193,8 +192,6 @@ export function MainApp({
         sessionTarget={cfg?.weekly_target_sessions ?? 4}
       />
 
-      {tab === "food" && isToday && <GoalCountdown profile={profile} goal={goal} />}
-
       <div className="tabs">
         <button className={`tab ${tab === "food" ? "active" : ""}`} onClick={() => setTab("food")}>
           Food
@@ -292,7 +289,7 @@ export function MainApp({
 
       {calendarOpen && (
         <CalendarView
-          goal={goal}
+          startDate={profile?.start_date ?? null}
           onClose={() => setCalendarOpen(false)}
           onPickDate={(d) => {
             setDate(d);
