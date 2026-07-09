@@ -112,6 +112,54 @@ create table if not exists public.streaks (
   total_days_logged int not null default 0
 );
 
+-- ---------- custom_exercises ----------
+-- Exercises the user added from the live logger because they weren't in the
+-- bundled library. Merged into the picker on every device (no media).
+create table if not exists public.custom_exercises (
+  id         uuid primary key default gen_random_uuid(),
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  name       text not null,
+  body_part  text not null,               -- library body_part vocabulary
+  equipment  text not null default 'body weight',
+  target     text not null default '',   -- primary muscle, freeform
+  created_at timestamptz not null default now()
+);
+create index if not exists custom_exercises_user_idx on public.custom_exercises(user_id);
+
+-- ---------- ai_plans (AI Coach: 30-day meal & training plans) ----------
+-- One row per generated plan. Only one 'active' plan per kind is honored by
+-- the app; generating a new plan stops the previous one.
+create table if not exists public.ai_plans (
+  id              uuid primary key default gen_random_uuid(),
+  user_id         uuid not null references auth.users(id) on delete cascade,
+  kind            text not null,                    -- 'meal' | 'workout'
+  status          text not null default 'active',   -- active | stopped | completed
+  start_date      date not null,
+  end_date        date not null,
+  context_summary text,                             -- what the AI read from 30-day history
+  meta            jsonb,                            -- goal snapshot, split, etc.
+  created_at      timestamptz not null default now()
+);
+create index if not exists ai_plans_user_kind_idx on public.ai_plans(user_id, kind, status);
+
+-- One row per calendar day of a plan. payload holds the AI suggestion
+-- (meals[] with macros/recipe/image, or workout{} with exercises). actual
+-- holds what the user checked off / logged; photo_url is the daily check-in.
+create table if not exists public.ai_plan_days (
+  id           uuid primary key default gen_random_uuid(),
+  plan_id      uuid not null references public.ai_plans(id) on delete cascade,
+  user_id      uuid not null references auth.users(id) on delete cascade,
+  date         date not null,
+  day_index    int not null,                        -- 1..30
+  payload      jsonb not null,
+  completed    boolean not null default false,
+  completed_at timestamptz,
+  photo_url    text,
+  actual       jsonb,
+  unique (plan_id, date)
+);
+create index if not exists ai_plan_days_user_date_idx on public.ai_plan_days(user_id, date);
+
 -- ---------- medical_documents ----------
 create table if not exists public.medical_documents (
   id           uuid primary key default gen_random_uuid(),
@@ -135,13 +183,16 @@ alter table public.food_logs      enable row level security;
 alter table public.exercise_logs  enable row level security;
 alter table public.exercise_config enable row level security;
 alter table public.streaks        enable row level security;
+alter table public.custom_exercises enable row level security;
+alter table public.ai_plans       enable row level security;
+alter table public.ai_plan_days   enable row level security;
 alter table public.medical_documents enable row level security;
 
 do $$
 declare t text;
 begin
   foreach t in array array[
-    'profiles','goals','weigh_ins','food_logs','exercise_logs','exercise_config','streaks','medical_documents'
+    'profiles','goals','weigh_ins','food_logs','exercise_logs','exercise_config','streaks','custom_exercises','ai_plans','ai_plan_days','medical_documents'
   ] loop
     execute format('drop policy if exists "own rows select" on public.%I;', t);
     execute format('drop policy if exists "own rows insert" on public.%I;', t);
@@ -171,6 +222,15 @@ create policy "own photos all" on storage.objects
   for all
   using (bucket_id = 'photos' and (storage.foldername(name))[1] = auth.uid()::text)
   with check (bucket_id = 'photos' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ============================================================================
+-- Public bucket for AI-Coach meal images. Server routes (service role) cache
+-- dish photos here on first view; the browser reads via the public URL, so no
+-- object policies are needed for reads and no anon writes are possible.
+-- ============================================================================
+insert into storage.buckets (id, name, public)
+values ('food-media', 'food-media', true)
+on conflict (id) do nothing;
 
 -- ============================================================================
 -- Storage bucket for private medical documents.

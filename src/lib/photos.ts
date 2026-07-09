@@ -25,7 +25,7 @@ export function fileToDataUrl(file: File, maxEdge = 1280, quality = 0.82): Promi
 }
 
 // Uploads a data URL to the user's private Storage folder, returns the storage path.
-export async function uploadPhoto(dataUrl: string, kind: "food" | "progress"): Promise<string | null> {
+export async function uploadPhoto(dataUrl: string, kind: "food" | "progress" | "plan"): Promise<string | null> {
   const sb = createClient();
   const { data: u } = await sb.auth.getUser();
   if (!u.user) return null;

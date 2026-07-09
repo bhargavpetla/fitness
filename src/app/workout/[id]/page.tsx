@@ -276,12 +276,17 @@ function ExerciseCard({
   insightBusy: boolean;
   comparison: ReturnType<typeof compareExercise> | null;
 }) {
-  const [img, setImg] = useState<string | null>(null);
+  // Live-logged exercises carry their library media key — show the real
+  // animation. Typed workouts fall back to the AI-generated illustration.
+  const [img, setImg] = useState<string | null>(
+    exercise.media ? `/exercise-media/videos/${exercise.media}.gif` : null
+  );
   useEffect(() => {
+    if (exercise.media) return;
     let on = true;
     getExerciseImage(exercise.name, exercise.primaryMuscle).then((u) => on && setImg(u));
     return () => { on = false; };
-  }, [exercise.name, exercise.primaryMuscle]);
+  }, [exercise.name, exercise.primaryMuscle, exercise.media]);
 
   const muscleLabel = [exercise.primaryMuscle, ...exercise.secondaryMuscles].filter(Boolean).slice(0, 2).join(" · ");
 

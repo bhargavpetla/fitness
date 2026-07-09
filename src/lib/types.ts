@@ -104,6 +104,9 @@ export interface ParsedStrengthExercise {
   // Canonical per-set data for new logs.
   set_list?: ExerciseSet[];
   volume?: number | null;
+  // Set when the exercise was picked from the exercise library during a live
+  // workout: `${id}-${media_id}` addresses its GIF/thumbnail on the media CDN.
+  media?: string | null;
   // Legacy aggregate shape (older logs / fallback). Still read by the
   // normalizer in lib/workout.ts so old entries keep rendering.
   sets?: number;
@@ -175,6 +178,94 @@ export interface MedicalDocument {
   storage_path: string;
   text_content: string | null;
   created_at: string;
+}
+
+// A user-added exercise that wasn't in the bundled library. Lives in Supabase
+// so it appears in the picker on every device, marked "custom" (no GIF).
+export interface CustomExercise {
+  id: string;
+  user_id: string;
+  name: string;
+  body_part: string;
+  equipment: string;
+  target: string;
+  created_at: string;
+}
+
+// ---- AI Coach plans (30-day meal & training plans) ----
+
+export type PlanKind = "meal" | "workout";
+export type PlanStatus = "active" | "stopped" | "completed";
+
+export interface AiPlan {
+  id: string;
+  user_id: string;
+  kind: PlanKind;
+  status: PlanStatus;
+  start_date: string;
+  end_date: string;
+  context_summary: string | null; // what the AI understood from the 30-day history
+  meta: Record<string, unknown> | null;
+  created_at: string;
+}
+
+// One suggested meal in a plan day. Recipe/image are attached server-side by
+// matching the dish against the Indian recipe dataset; both may be absent.
+export interface PlanMeal {
+  slot: string; // breakfast | lunch | snack | dinner
+  name: string;
+  desc: string;
+  portion: string; // e.g. "2 rotis + 1 katori dal"
+  calories: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  verified?: boolean; // macros grounded in the INDB dataset
+  image_key?: string | null; // slug in the food-media storage cache
+  image_src?: string | null; // original dataset image URL (fallback)
+  recipe?: { steps: string[]; time_min: number | null } | null;
+}
+
+export interface MealDayPayload {
+  meals: PlanMeal[];
+  totals: FoodTotals;
+  note?: string | null; // one-line coach note for the day
+}
+
+export interface PlanExercise {
+  name: string;
+  sets: number;
+  reps: number;
+  weight_kg: number | null; // null = bodyweight / user's choice
+  note?: string | null; // e.g. "up 2.5kg from last week"
+  media?: string | null; // exercise-library media key (GIF/thumb)
+  primary_muscle?: string | null;
+  steps?: string[]; // how-to, from the exercise library
+}
+
+export interface WorkoutDayPayload {
+  kind: "workout" | "rest";
+  name: string; // "Push Day" / "Rest"
+  focus?: string[];
+  exercises: PlanExercise[];
+  note?: string | null;
+}
+
+export interface AiPlanDay {
+  id: string;
+  plan_id: string;
+  user_id: string;
+  date: string;
+  day_index: number; // 1..30
+  payload: MealDayPayload | WorkoutDayPayload;
+  completed: boolean;
+  completed_at: string | null;
+  photo_url: string | null; // gamified daily photo check-in
+  actual: {
+    checked?: boolean[]; // per-meal ticks
+    exercise_log_id?: string; // workout logged into the real tracker
+    food_log_ids?: string[]; // meals logged into the real tracker
+  } | null;
 }
 
 // Body analysis result (Claude) — onboarding and 7-day check-in.

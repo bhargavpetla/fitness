@@ -13,6 +13,10 @@ import type {
   ParsedExercise,
   ExerciseConfig,
   Streak,
+  CustomExercise,
+  AiPlan,
+  AiPlanDay,
+  PlanKind,
 } from "@/lib/types";
 
 // Thin client-side data layer over Supabase. RLS guarantees rows belong to the user.
@@ -254,6 +258,80 @@ export async function saveExerciseConfig(cfg: Partial<ExerciseConfig>): Promise<
     cardio_target_per_week: cfg.cardio_target_per_week ?? null,
     updated_at: new Date().toISOString(),
   });
+}
+
+// ---- custom exercises (user's own additions to the exercise library) ----
+
+export async function fetchCustomExercises(): Promise<CustomExercise[]> {
+  const sb = createClient();
+  const { data } = await sb.from("custom_exercises").select("*").order("created_at", { ascending: false });
+  return (data as CustomExercise[]) ?? [];
+}
+
+export async function addCustomExercise(input: {
+  name: string;
+  body_part: string;
+  equipment: string;
+  target: string;
+}): Promise<CustomExercise | null> {
+  const sb = createClient();
+  const { data: u } = await sb.auth.getUser();
+  if (!u.user) return null;
+  const { data, error } = await sb
+    .from("custom_exercises")
+    .insert({ user_id: u.user.id, ...input })
+    .select()
+    .single();
+  if (error) {
+    console.error(error);
+    return null;
+  }
+  return data as CustomExercise;
+}
+
+// ---- AI Coach plans ----
+
+export async function fetchActivePlan(kind: PlanKind): Promise<AiPlan | null> {
+  const sb = createClient();
+  const { data } = await sb
+    .from("ai_plans")
+    .select("*")
+    .eq("kind", kind)
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data as AiPlan) ?? null;
+}
+
+export async function fetchPlanDays(planId: string): Promise<AiPlanDay[]> {
+  const sb = createClient();
+  const { data } = await sb
+    .from("ai_plan_days")
+    .select("*")
+    .eq("plan_id", planId)
+    .order("day_index", { ascending: true });
+  return (data as AiPlanDay[]) ?? [];
+}
+
+export async function updatePlanDay(
+  id: string,
+  patch: Partial<Pick<AiPlanDay, "completed" | "completed_at" | "photo_url" | "actual">>
+): Promise<void> {
+  const sb = createClient();
+  await sb.from("ai_plan_days").update(patch).eq("id", id);
+}
+
+// Stop keeps the plan (and its history) around; delete removes it entirely
+// (ai_plan_days cascade).
+export async function setPlanStatus(id: string, status: "stopped" | "completed"): Promise<void> {
+  const sb = createClient();
+  await sb.from("ai_plans").update({ status }).eq("id", id);
+}
+
+export async function deletePlan(id: string): Promise<void> {
+  const sb = createClient();
+  await sb.from("ai_plans").delete().eq("id", id);
 }
 
 export async function fetchStreak(): Promise<Streak | null> {

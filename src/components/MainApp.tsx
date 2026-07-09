@@ -25,6 +25,7 @@ import {
 import { uploadPhoto } from "@/lib/photos";
 import { normalizeWorkout, totalVolume } from "@/lib/workout";
 import { todayStr, addDays, prettyDate, dayNumber, weekStart } from "@/lib/date";
+import { loadSession } from "@/lib/liveSession";
 import { liveStreak } from "@/lib/streak";
 import { buildNudge } from "@/lib/nudges";
 import type { Profile, Goal, FoodLog, ExerciseLog, ExerciseConfig, Streak } from "@/lib/types";
@@ -46,7 +47,15 @@ export function MainApp() {
   const [toast, setToast] = useState<string | null>(null);
   const [insight, setInsight] = useState<string | null>(null);
   const [insightBusy, setInsightBusy] = useState(false);
+  const [liveInProgress, setLiveInProgress] = useState(false);
   const [now, setNow] = useState(() => new Date());
+
+  // "Resume workout" if a live session with logged exercises is sitting in
+  // localStorage (e.g. the user backed out mid-gym-session).
+  useEffect(() => {
+    const s = loadSession();
+    setLiveInProgress(!!s && s.entries.length > 0);
+  }, [tab]);
 
   const isToday = date === todayStr();
 
@@ -157,6 +166,9 @@ export function MainApp() {
           </div>
         </div>
         <span className={`flame ${streakN > 0 ? "active" : ""}`}>🔥 {streakN}</span>
+        <button className="icon-btn" aria-label="AI Coach" title="AI Coach" onClick={() => router.push("/coach")}>
+          ✨
+        </button>
         <button className="icon-btn" aria-label="Settings" onClick={() => router.push("/settings")}>
           ⚙
         </button>
@@ -215,13 +227,27 @@ export function MainApp() {
       </div>
 
       <div className="add-bar">
-        <button className="btn-add" onClick={() => setSheet(true)}>
-          + Add {tab === "food" ? "meal" : "workout"}
-        </button>
-        {tab === "food" && (
-          <button className="btn-guru" onClick={() => setGuruOpen(true)} aria-label="Ask the AI Guru" title="Ask the Guru">
-            ✨
-          </button>
+        {tab === "food" ? (
+          <>
+            <button className="btn-add" onClick={() => setSheet(true)}>+ Add meal</button>
+            <button className="btn-guru" onClick={() => setGuruOpen(true)} aria-label="Ask the AI Guru" title="Ask the Guru">
+              ✨
+            </button>
+          </>
+        ) : (
+          <>
+            <button className="btn-add" onClick={() => router.push("/workout/live")}>
+              {liveInProgress ? "▶ Resume workout" : "▶ Start workout"}
+            </button>
+            <button
+              className="btn-guru btn-typeit"
+              onClick={() => setSheet(true)}
+              aria-label="Type a workout instead"
+              title="Type it instead"
+            >
+              ⌨
+            </button>
+          </>
         )}
       </div>
 

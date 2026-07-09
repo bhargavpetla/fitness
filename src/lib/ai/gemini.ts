@@ -204,6 +204,211 @@ export async function parseExercise(rawInput: string): Promise<ParsedExercise> {
   };
 }
 
+// Enriches a live-logged (structured) workout: the user already picked every
+// exercise and typed every set, so the model only names the session, maps
+// muscles into the app's vocabulary, and estimates calories — it must NOT
+// touch the numbers. Sets stay verbatim; the route reassembles them locally.
+export interface LiveFinishInput {
+  duration_min: number;
+  exercises: Array<{
+    name: string;
+    body_part: string;
+    equipment: string;
+    target: string;
+    secondary: string[];
+    sets: Array<{ weight_kg: number | null; reps: number; each_side?: boolean }>;
+  }>;
+}
+
+export interface LiveFinishResult {
+  workout_name: string;
+  muscle_groups: string[];
+  est_calories: number | null;
+  summary: string;
+  exercise_muscles: Record<string, { primary_muscle: string; secondary_muscles: string[] }>;
+}
+
+export async function finishLiveWorkout(input: LiveFinishInput): Promise<LiveFinishResult> {
+  const env = serverEnv();
+  const ai = genai();
+
+  const system = `You are a strength coach labeling an already-logged workout. The sets/reps/weights are final — do not restate or change them. Return STRICT JSON only.
+- workout_name: a SHORT punchy name (1-2 words), preferring the classic split when it fits — "Push Day", "Pull Day", "Leg Day", "Upper Body", "Full Body".
+- muscle_groups: top-level groups trained, ordered by emphasis (e.g. ["Chest","Shoulders","Triceps"]).
+- exercise_muscles: for EVERY exercise name given, its primary and secondary muscles using this vocabulary: Chest, Upper Chest, Lower Chest, Front Delts, Side Delts, Rear Delts, Triceps, Biceps, Lats, Upper Back, Traps, Quads, Hamstrings, Glutes, Calves, Core, Forearms.
+- est_calories: rough calorie burn for the session given its duration and volume.
+- summary: one friendly sentence about the session.
+Return JSON shaped exactly:
+{ "workout_name": string, "muscle_groups": [string], "est_calories": number, "summary": string,
+  "exercise_muscles": { "<exercise name>": { "primary_muscle": string, "secondary_muscles": [string] } } }`;
+
+  const res = await ai.models.generateContent({
+    model: env.geminiExerciseModel,
+    contents: [{ role: "user", parts: [{ text: JSON.stringify(input) }] }],
+    config: {
+      systemInstruction: system,
+      responseMimeType: "application/json",
+      temperature: 0.2,
+      thinkingConfig: { thinkingBudget: 0 },
+    },
+  });
+
+  const raw = JSON.parse(extractJson(res.text ?? "")) as Partial<LiveFinishResult>;
+  const muscles: LiveFinishResult["exercise_muscles"] = {};
+  if (raw.exercise_muscles && typeof raw.exercise_muscles === "object") {
+    for (const [k, v] of Object.entries(raw.exercise_muscles)) {
+      muscles[String(k)] = {
+        primary_muscle: String(v?.primary_muscle ?? ""),
+        secondary_muscles: Array.isArray(v?.secondary_muscles) ? v.secondary_muscles.map(String) : [],
+      };
+    }
+  }
+  return {
+    workout_name: String(raw.workout_name ?? ""),
+    muscle_groups: Array.isArray(raw.muscle_groups) ? raw.muscle_groups.map(String) : [],
+    est_calories: raw.est_calories == null ? null : num(raw.est_calories),
+    summary: String(raw.summary ?? ""),
+    exercise_muscles: muscles,
+  };
+}
+
+// ---- AI Coach: 30-day plan generation ----
+// Both planners read a compact digest of the user's last 30 days so the plan
+// grows out of what they actually eat/lift, not generic templates. The meal
+// planner is grounded with the INDB table (measured Indian dish macros) so
+// suggested numbers are dataset-backed wherever a dish matches.
+
+export interface RawMealPlan {
+  context_summary: string;
+  days: Array<{
+    day: number;
+    note?: string;
+    meals: Array<{
+      slot: string;
+      name: string;
+      desc: string;
+      portion: string;
+      calories: number;
+      protein_g: number;
+      carbs_g: number;
+      fat_g: number;
+      verified?: boolean;
+    }>;
+  }>;
+}
+
+export async function generateMealPlan(input: {
+  dayFrom: number; // plans are generated in halves to fit serverless timeouts
+  dayTo: number;
+  historyDigest: string;
+  goalText: string;
+  profileNote: string;
+  indbTable: string;
+  continuityNote?: string; // for the second half: what the first half planned
+}): Promise<RawMealPlan> {
+  const env = serverEnv();
+  const ai = genai();
+  const count = input.dayTo - input.dayFrom + 1;
+
+  const system = `You are an Indian nutrition coach building days ${input.dayFrom}–${input.dayTo} of a 30-day meal plan. Return STRICT JSON only.
+
+You are given:
+1. A digest of what the user ACTUALLY ate over the last 30 days — mirror their food culture, staples, and meal rhythm. Do not impose foreign cuisines; evolve what they already eat toward their goal.
+2. Their daily macro goal.
+3. A reference table of MEASURED Indian dish macros (per serving unit). When a meal uses a dish from this table, base its macros on the table values scaled by portion, and set "verified": true. Prefer table dishes — aim for most meals verified.
+
+Rules:
+- Exactly ${count} days, numbered ${input.dayFrom} to ${input.dayTo}, meals per day: breakfast, lunch, snack, dinner.
+- Sum each day's calories: keep the total within ±7% of the calorie goal and protein at or above the protein goal.
+- VARIETY is sacred: never repeat a main dish within any 4-day window; rotate regional styles across the weeks.
+- "portion": concrete Indian household measures ("2 rotis + 1 katori dal", "1 bowl (200g)").
+- "desc": max 12 words, appetizing, plain language.
+- "note": optional one-line coach tip on ~2 days per week.
+- Keep dish names canonical and simple ("Palak Paneer", "Masala Dosa") — they are matched against a recipe database for photos.
+
+Return JSON shaped exactly:
+{ "context_summary": "<3-4 sentences on their eating pattern and how this plan fits>",
+  "days": [ { "day": ${input.dayFrom}, "note": "...", "meals": [ { "slot": "breakfast", "name": string, "desc": string, "portion": string, "calories": number, "protein_g": number, "carbs_g": number, "fat_g": number, "verified": boolean } ] } ] }`;
+
+  const user = `MY LAST 30 DAYS OF MEALS:\n${input.historyDigest}\n\nMY DAILY GOAL:\n${input.goalText}\n\nABOUT ME: ${input.profileNote}\n${input.continuityNote ? `\nALREADY PLANNED (days ${input.dayFrom - 1} and earlier — do not repeat their main dishes in the first 3 days you plan, and keep the same overall style):\n${input.continuityNote}\n` : ""}\nMEASURED INDIAN DISH MACROS (name | serving | kcal | macros):\n${input.indbTable}`;
+
+  const res = await ai.models.generateContent({
+    model: env.geminiFoodModel,
+    contents: [{ role: "user", parts: [{ text: user }] }],
+    config: {
+      systemInstruction: system,
+      responseMimeType: "application/json",
+      temperature: 0.6,
+      maxOutputTokens: 32768,
+      thinkingConfig: { thinkingBudget: 0 },
+    },
+  });
+  return JSON.parse(extractJson(res.text ?? "")) as RawMealPlan;
+}
+
+export interface RawWorkoutPlan {
+  context_summary: string;
+  days: Array<{
+    day: number;
+    kind: "workout" | "rest";
+    name: string;
+    focus?: string[];
+    note?: string;
+    exercises?: Array<{
+      name: string;
+      sets: number;
+      reps: number;
+      weight_kg: number | null;
+      note?: string;
+    }>;
+  }>;
+}
+
+export async function generateWorkoutPlan(input: {
+  dayFrom: number;
+  dayTo: number;
+  historyDigest: string;
+  configText: string;
+  profileNote: string;
+  continuityNote?: string;
+}): Promise<RawWorkoutPlan> {
+  const env = serverEnv();
+  const ai = genai();
+  const count = input.dayTo - input.dayFrom + 1;
+
+  const system = `You are a strength coach building days ${input.dayFrom}–${input.dayTo} of a 30-day training plan around PROGRESSIVE OVERLOAD. Return STRICT JSON only.
+
+You are given the user's actual workouts from the last 30 days (exercises, sets × reps @ kg) and their weekly session target. Build on THEIR lifts and THEIR working weights — never prescribe a jump bigger than +2.5kg or +1-2 reps over what they demonstrably handle.
+
+Rules:
+- Exactly ${count} days, numbered ${input.dayFrom} to ${input.dayTo}; respect their weekly session target with the rest spread sensibly (kind "rest", no exercises).
+- Use a coherent split inferred from their history (e.g. Push/Pull/Legs, Upper/Lower).
+- Week-over-week progression on repeated exercises: small weight or rep bumps; every 4th week slightly lighter (deload flavor).
+- 4-7 exercises per workout. Prefer the exact exercise names they already do; add close variations for balance (use common gym names — they are matched to an animation library).
+- weight_kg: their realistic working weight, or null for bodyweight moves.
+- "note": short cue when something changed ("up 2.5kg from last week", "same weight, +1 rep").
+- "name": punchy day name ("Push Day", "Pull Day", "Leg Day", "Rest").
+
+Return JSON shaped exactly:
+{ "context_summary": "<3-4 sentences on their training pattern and the plan's logic>",
+  "days": [ { "day": ${input.dayFrom}, "kind": "workout", "name": "Push Day", "focus": ["Chest","Triceps"], "note": "...", "exercises": [ { "name": string, "sets": number, "reps": number, "weight_kg": number|null, "note": string } ] } ] }`;
+
+  const user = `MY LAST 30 DAYS OF TRAINING:\n${input.historyDigest}\n\nMY SETUP:\n${input.configText}\n\nABOUT ME: ${input.profileNote}${input.continuityNote ? `\n\nALREADY PLANNED (the first half of this plan — continue its split rotation and progress its weights, do not reset):\n${input.continuityNote}` : ""}`;
+
+  const res = await ai.models.generateContent({
+    model: env.geminiExerciseModel,
+    contents: [{ role: "user", parts: [{ text: user }] }],
+    config: {
+      systemInstruction: system,
+      responseMimeType: "application/json",
+      temperature: 0.4,
+      maxOutputTokens: 32768,
+      thinkingConfig: { thinkingBudget: 0 },
+    },
+  });
+  return JSON.parse(extractJson(res.text ?? "")) as RawWorkoutPlan;
+}
+
 // Converts a legacy aggregate exercise ({sets, reps, weight_kg}) into a set list.
 function legacyToSetList(e: ParsedStrengthExercise) {
   const count = Number(e.sets) || 0;

@@ -17,12 +17,14 @@
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "recharts": "^2.15.0",
+    "server-only": "^0.0.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "pg": "^8.22.0",
     "typescript": "^5"
   }
 }

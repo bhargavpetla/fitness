@@ -15,6 +15,7 @@ export interface NormalizedExercise {
   secondaryMuscles: string[];
   sets: ExerciseSet[];
   volume: number;
+  media: string | null; // exercise-library media key for live-logged workouts
 }
 
 // Effective load moved for one rep of a set (dumbbell "each side" loads both).
@@ -42,6 +43,7 @@ export function normalizeExercise(e: ParsedStrengthExercise): NormalizedExercise
     secondaryMuscles: e.secondary_muscles ?? [],
     sets,
     volume: Math.round(volume),
+    media: e.media ?? null,
   };
 }
 
