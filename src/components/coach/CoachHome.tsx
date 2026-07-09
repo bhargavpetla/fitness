@@ -6,6 +6,7 @@ import { Toast } from "@/components/Toast";
 import { LoadingJoke } from "@/components/LoadingJoke";
 import { ModeSwitch } from "@/components/ModeSwitch";
 import { Icon } from "@/components/Icon";
+import { fx } from "@/lib/fx";
 import { PlanHeader } from "./PlanHeader";
 import { MealDay } from "./MealDay";
 import { WorkoutDay } from "./WorkoutDay";
@@ -104,7 +105,8 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error ?? "Could not generate the plan.");
       await load();
-      setToast(kind === "meal" ? "Your week of meals is ready 🍛" : "Your training week is ready 💪");
+      fx.success();
+      setToast(kind === "meal" ? "Your week of meals is ready 🎉" : "Your training week is ready 💪");
     } catch (e) {
       setToast((e as Error).message);
     } finally {
@@ -126,7 +128,8 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
       const json = await res.json().catch(() => null);
       if (!res.ok) throw new Error(json?.error ?? "Could not adjust the plan.");
       await load();
-      setToast("Week adjusted around how it's actually going ⤺");
+      fx.success();
+      setToast("Week adjusted around how it's actually going");
     } catch (e) {
       setToast((e as Error).message);
     } finally {
@@ -141,7 +144,8 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
     await updatePlanMeta(plan.id, { ...(plan.meta ?? {}), feedback: fb });
     await setPlanStatus(plan.id, "completed");
     await load();
-    setToast("Noted — your next week will be tuned to that 🎯");
+    fx.success();
+    setToast("Noted — your next week will be tuned to that");
   }
 
   async function stop() {
@@ -163,14 +167,14 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
     return (
       <div className="app-shell">
         <div className="topbar">
-          <span className="daycount">AI Coach ✨</span>
+          <span className="daycount">Coach</span>
         </div>
         <div className="coach-hero">
           {access === "checking" ? (
             <span className="spinner" style={{ borderTopColor: "var(--accent)" }} />
           ) : (
             <>
-              <div className="coach-hero-icon">🔒</div>
+              <div className="coach-hero-icon"><Icon name="lock-closed-outline" size={36} /></div>
               <h2>The Coach is earned</h2>
               <p className="muted">
                 Log for {UNLOCK_DAYS} days in a row and the AI Coach unlocks — it needs to watch how you
@@ -197,7 +201,9 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
 
       <div className="topbar glass topbar-sticky" ref={topbarRef}>
-        <span className="daycount">AI Coach ✨</span>
+        <span className="daycount" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <Icon name="flash-outline" size={16} /> Coach
+        </span>
         <ModeSwitch mode="ai" onSwitch={switchToManual} />
         <button className="icon-btn" aria-label="Analytics" title="Analytics" onClick={() => router.push("/analytics")}>
           <Icon name="stats-chart-outline" />
@@ -208,11 +214,11 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
       </div>
 
       <div className="tabs" style={{ marginBottom: 4 }}>
-        <button className={`tab ${kind === "meal" ? "active" : ""}`} onClick={() => setKind("meal")}>
-          🍛 Meals
+        <button className={`tab ${kind === "meal" ? "active" : ""}`} onClick={() => { fx.tap(); setKind("meal"); }}>
+          Meals
         </button>
-        <button className={`tab ${kind === "workout" ? "active" : ""}`} onClick={() => setKind("workout")}>
-          🏋️ Training
+        <button className={`tab ${kind === "workout" ? "active" : ""}`} onClick={() => { fx.tap(); setKind("workout"); }}>
+          Training
         </button>
       </div>
 
@@ -223,7 +229,9 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
           <div className="center-screen"><span className="spinner" style={{ borderTopColor: "var(--accent)" }} /></div>
         ) : !plan ? (
           <div className="coach-hero">
-            <div className="coach-hero-icon">{kind === "meal" ? "🍛" : "📈"}</div>
+            <div className="coach-hero-icon">
+              <Icon name={kind === "meal" ? "restaurant-outline" : "barbell-outline"} size={36} />
+            </div>
             <h2>{kind === "meal" ? "A week of meals, made for you" : "A week of training, built on your lifts"}</h2>
             <p className="muted">
               {kind === "meal"
@@ -236,8 +244,8 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
                 <span className="setup-q-label">Cheat meals this week?</span>
                 <div className="pill-group" style={{ justifyContent: "center" }}>
                   {[0, 1, 2, 3].map((n) => (
-                    <button key={n} className={`pill ${cheatMeals === n ? "on" : ""}`} onClick={() => setCheatMeals(n)}>
-                      {n === 0 ? "None" : `${n} 🎉`}
+                    <button key={n} className={`pill ${cheatMeals === n ? "on" : ""}`} onClick={() => { fx.tap(); setCheatMeals(n); }}>
+                      {n === 0 ? "None" : n}
                     </button>
                   ))}
                 </div>
@@ -247,8 +255,8 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
                 <span className="setup-q-label">Rest days this week?</span>
                 <div className="pill-group" style={{ justifyContent: "center" }}>
                   {[1, 2, 3, 4].map((n) => (
-                    <button key={n} className={`pill ${restDays === n ? "on" : ""}`} onClick={() => setRestDays(n)}>
-                      {n} 😌
+                    <button key={n} className={`pill ${restDays === n ? "on" : ""}`} onClick={() => { fx.tap(); setRestDays(n); }}>
+                      {n}
                     </button>
                   ))}
                 </div>
@@ -258,8 +266,8 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
             <p className="muted" style={{ fontSize: 13 }}>
               A fresh week every 7 days, tuned by your feedback. Stop or delete it anytime.
             </p>
-            <button className="btn btn-primary" onClick={generate}>
-              ✨ Plan my week
+            <button className="btn btn-primary" onClick={() => { fx.pop(); generate(); }}>
+              <Icon name="flash-outline" size={16} /> Plan my week
             </button>
           </div>
         ) : (
@@ -284,7 +292,7 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
                 <button
                   key={d.id}
                   className={`day-chip ${i === sel ? "sel" : ""} ${d.completed ? "done" : ""} ${d.date === today ? "today" : ""} ${d.date > today ? "future" : ""}`}
-                  onClick={() => setSel(i)}
+                  onClick={() => { fx.tap(); setSel(i); }}
                 >
                   <span className="day-chip-n">{d.day_index}</span>
                   {d.completed ? "✓" : d.date === today ? "•" : ""}
@@ -296,7 +304,9 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
               <>
                 <div className="day-title">
                   <span>Day {day.day_index} · {prettyDate(day.date)}</span>
-                  {day.date > today && <span className="day-locked">🔒 unlocks {prettyDate(day.date)}</span>}
+                  {day.date > today && (
+                    <span className="day-locked"><Icon name="lock-closed-outline" size={12} /> unlocks {prettyDate(day.date)}</span>
+                  )}
                 </div>
                 {kind === "meal" ? (
                   <MealDay
@@ -357,20 +367,24 @@ function FeedbackCard({
   }
 
   return (
-    <div className="card feedback-card" style={{ animation: "none" }}>
+    <div className="card feedback-card pop-in">
       <div className="meal">Week done — {completed}/{total} days {completed === total ? "🏆" : "🎉"}</div>
       <p className="sub" style={{ marginBottom: 10 }}>Tell the coach how it went; next week adapts to this.</p>
 
       <span className="setup-q-label">Did you like this week?</span>
       <div className="pill-group" style={{ marginBottom: 10 }}>
-        <button className={`pill ${liked === true ? "on" : ""}`} onClick={() => setLiked(true)}>👍 Loved it</button>
-        <button className={`pill ${liked === false ? "on" : ""}`} onClick={() => setLiked(false)}>👎 Not really</button>
+        <button className={`pill ${liked === true ? "on" : ""}`} onClick={() => { fx.tap(); setLiked(true); }}>
+          <Icon name="thumbs-up-outline" size={14} /> Loved it
+        </button>
+        <button className={`pill ${liked === false ? "on" : ""}`} onClick={() => { fx.tap(); setLiked(false); }}>
+          <Icon name="thumbs-down-outline" size={14} /> Not really
+        </button>
       </div>
 
       <span className="setup-q-label">{kind === "workout" ? "Intensity next week?" : "Food next week?"}</span>
       <div className="pill-group" style={{ marginBottom: 10 }}>
         {(["less", "same", "more"] as const).map((t) => (
-          <button key={t} className={`pill ${tune === t ? "on" : ""}`} onClick={() => setTune(t)}>
+          <button key={t} className={`pill ${tune === t ? "on" : ""}`} onClick={() => { fx.tap(); setTune(t); }}>
             {tuneLabels[t]}
           </button>
         ))}

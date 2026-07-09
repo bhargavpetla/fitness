@@ -10,6 +10,8 @@ import {
   saveExerciseConfig,
 } from "@/lib/db";
 import { exportEverything } from "@/lib/export";
+import { Icon } from "@/components/Icon";
+import { fx, fxMuted, setFxMuted } from "@/lib/fx";
 import type { Profile, Goal, ExerciseConfig } from "@/lib/types";
 
 const MEDICAL_DOC_ACCEPT =
@@ -34,6 +36,11 @@ export default function Settings() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [sounds, setSounds] = useState(true);
+
+  useEffect(() => {
+    setSounds(!fxMuted());
+  }, []);
   const [medicalDocs, setMedicalDocs] = useState<SettingsMedicalDocument[]>([]);
   const [uploadingMedicalDoc, setUploadingMedicalDoc] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
@@ -429,6 +436,23 @@ export default function Settings() {
           )}
           <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
             PDF, DOCX, or TXT. Up to {MAX_STORED_MEDICAL_DOCS} saved files, 2 MB each, 3 MB total.
+          </p>
+        </Section>
+
+        <Section title="Sounds & feel">
+          <button
+            className={`pill ${sounds ? "on" : ""}`}
+            onClick={() => {
+              const next = !sounds;
+              setSounds(next);
+              setFxMuted(!next);
+              if (next) fx.pop();
+            }}
+          >
+            <Icon name="musical-notes-outline" size={14} /> Sounds {sounds ? "on" : "off"}
+          </button>
+          <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
+            Little clicks and chimes when you log sets, complete days, and flip modes.
           </p>
         </Section>
 

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ExercisePicker } from "./ExercisePicker";
+import { Icon } from "@/components/Icon";
 import { LoadingJoke } from "@/components/LoadingJoke";
 import { Toast } from "@/components/Toast";
 import { useLiquidGlass } from "@/lib/liquidGlass";
@@ -19,6 +20,7 @@ import {
   type LiveEntry,
 } from "@/lib/liveSession";
 import { addExerciseLog } from "@/lib/db";
+import { fx } from "@/lib/fx";
 import { todayStr } from "@/lib/date";
 import { setVolume } from "@/lib/workout";
 import type { ExerciseSet, ParsedExercise } from "@/lib/types";
@@ -80,6 +82,7 @@ export function LiveWorkout() {
   }
 
   function logSet(key: string, set: ExerciseSet) {
+    fx.pop();
     update((s) => ({
       ...s,
       lastSetAt: Date.now(),
@@ -88,6 +91,7 @@ export function LiveWorkout() {
   }
 
   function removeSet(key: string, idx: number) {
+    fx.remove();
     update((s) => ({
       ...s,
       entries: s.entries.map((e) => (e.key === key ? { ...e, sets: e.sets.filter((_, i) => i !== idx) } : e)),
@@ -135,6 +139,7 @@ export function LiveWorkout() {
       const log = await addExerciseLog({ date: todayStr(), parsed, raw_input: `Live: ${raw}` });
       if (!log) throw new Error("Could not save the workout.");
       clearSession();
+      fx.success();
       router.replace(`/workout/${log.id}`);
     } catch (e) {
       setSaving(false);
@@ -187,7 +192,7 @@ export function LiveWorkout() {
       <div className="content live-body">
         {session.entries.length === 0 ? (
           <div className="center-screen" style={{ padding: "60px 20px" }}>
-            <div style={{ fontSize: 40 }}>🏋️</div>
+            <span style={{ color: "var(--ink-2)" }}><Icon name="barbell-outline" size={40} /></span>
             <p className="muted" style={{ maxWidth: 260 }}>
               Pick your first exercise. Log each set right after you rack the weight — the AI writes it all up when you're done.
             </p>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Icon } from "@/components/Icon";
 import type { FoodParseResult, ParsedExercise } from "@/lib/types";
 import { fileToDataUrl } from "@/lib/photos";
 import { fetchRecentFoodInputs, type RecentFoodInput } from "@/lib/db";
@@ -159,7 +160,7 @@ export function AddSheet({
               <>
                 <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={pickPhoto} />
                 <button className="btn btn-ghost" style={{ marginTop: 10 }} onClick={() => fileRef.current?.click()}>
-                  {photo ? "✓ Photo attached" : "📷 Add a photo (optional)"}
+                  {photo ? "✓ Photo attached" : <><Icon name="camera-outline" size={16} /> Add a photo (optional)</>}
                 </button>
               </>
             )}

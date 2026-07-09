@@ -42,10 +42,10 @@ export function PlanHeader({
             <>
               <div className="plan-menu-backdrop" onClick={() => setMenu(false)} />
               <div className="plan-menu">
-                <button onClick={() => { setMenu(false); onAdjust(); }}>⤺ Adjust remaining days</button>
-                <button onClick={() => { setMenu(false); onRegenerate(); }}>↺ New week (replaces this one)</button>
-                <button onClick={() => { setMenu(false); onStop(); }}>⏸ Stop plan</button>
-                <button className="danger" onClick={() => { setMenu(false); onDelete(); }}>🗑 Delete plan</button>
+                <button onClick={() => { setMenu(false); onAdjust(); }}>Adjust remaining days</button>
+                <button onClick={() => { setMenu(false); onRegenerate(); }}>New week (replaces this one)</button>
+                <button onClick={() => { setMenu(false); onStop(); }}>Stop plan</button>
+                <button className="danger" onClick={() => { setMenu(false); onDelete(); }}>Delete plan</button>
               </div>
             </>
           )}

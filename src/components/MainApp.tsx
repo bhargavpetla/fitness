@@ -28,6 +28,7 @@ import { loadSession } from "@/lib/liveSession";
 import { useLiquidGlass } from "@/lib/liquidGlass";
 import { ModeSwitch } from "@/components/ModeSwitch";
 import { Icon } from "@/components/Icon";
+import { fx } from "@/lib/fx";
 import { buildNudge } from "@/lib/nudges";
 import type { Profile, Goal, FoodLog, ExerciseLog, ExerciseConfig, Streak } from "@/lib/types";
 
@@ -193,10 +194,10 @@ export function MainApp({
       />
 
       <div className="tabs">
-        <button className={`tab ${tab === "food" ? "active" : ""}`} onClick={() => setTab("food")}>
+        <button className={`tab ${tab === "food" ? "active" : ""}`} onClick={() => { fx.tap(); setTab("food"); }}>
           Food
         </button>
-        <button className={`tab ${tab === "exercise" ? "active" : ""}`} onClick={() => setTab("exercise")}>
+        <button className={`tab ${tab === "exercise" ? "active" : ""}`} onClick={() => { fx.tap(); setTab("exercise"); }}>
           Exercise
         </button>
       </div>
@@ -244,8 +245,8 @@ export function MainApp({
           </>
         ) : (
           <>
-            <button className="btn-add" onClick={() => router.push("/workout/live")}>
-              {liveInProgress ? "▶ Resume workout" : "▶ Start workout"}
+            <button className="btn-add" onClick={() => { fx.tap(); router.push("/workout/live"); }}>
+              <Icon name="play-outline" size={16} /> {liveInProgress ? "Resume workout" : "Start workout"}
             </button>
             <button
               className="btn-guru btn-typeit"
@@ -312,7 +313,7 @@ function FoodList({ foods, onDelete }: { foods: FoodLog[]; onDelete: (id: string
   if (foods.length === 0) {
     return (
       <div className="center-screen" style={{ padding: "30px 20px" }}>
-        <div style={{ fontSize: 34 }}>🍽️</div>
+        <span style={{ color: "var(--ink-2)" }}><Icon name="restaurant-outline" size={36} /></span>
         <p className="muted">No meals logged yet. Tap + to add one.</p>
       </div>
     );
@@ -358,7 +359,7 @@ function ExerciseList({
       )}
       {exercises.length === 0 ? (
         <div className="center-screen" style={{ padding: "30px 20px" }}>
-          <div style={{ fontSize: 34 }}>🏋️</div>
+          <span style={{ color: "var(--ink-2)" }}><Icon name="barbell-outline" size={36} /></span>
           <p className="muted">No workout logged. Even a rest day counts.</p>
           {cfg?.split_pattern && <p className="muted" style={{ fontSize: 13 }}>Pattern: {cfg.split_pattern}</p>}
         </div>
@@ -368,7 +369,7 @@ function ExerciseList({
             return (
               <div key={e.id} className={`card ${e.type === "rest" ? "rest" : ""}`} onClick={() => confirmDelete(e.id, onDelete)}>
                 <div className="card-top">
-                  <div className="meal">{e.type === "cardio" ? "🏃 Cardio" : e.type === "rest" ? "😌 Rest day" : "Other"}</div>
+                  <div className="meal">{e.type === "cardio" ? "Cardio" : e.type === "rest" ? "Rest day" : "Other"}</div>
                   {e.est_calories != null && <div className="kcal">~{Math.round(Number(e.est_calories))} kcal</div>}
                 </div>
                 <div className="sub">{e.parsed_json?.summary || e.raw_input}</div>
@@ -382,7 +383,7 @@ function ExerciseList({
             <div key={e.id} className="card wd-summary" onClick={() => onOpen(e.id)}>
               <div className="card-top">
                 <div>
-                  <div className="meal">{e.parsed_json?.workout_name || "Strength"} 💪</div>
+                  <div className="meal">{e.parsed_json?.workout_name || "Strength"}</div>
                   {groups.length > 0 && <div className="sub">{groups.join(" · ")}</div>}
                 </div>
                 <button

@@ -16,6 +16,7 @@ import {
 } from "@/lib/exerciseLibrary";
 import { fetchCustomExercises, addCustomExercise } from "@/lib/db";
 import { useLiquidGlass } from "@/lib/liquidGlass";
+import { fx } from "@/lib/fx";
 
 // Full-screen exercise picker for the live logger.
 // Flow: muscle group grid → filtered list (search + equipment chips) → detail
@@ -85,7 +86,21 @@ export function ExercisePicker({
     return counts;
   }, [all]);
 
+  // A real exercise photo fronts each muscle group — the dataset's own media,
+  // not an icon. First entry with media per body part wins.
+  const groupThumbs = useMemo(() => {
+    const thumbs = new Map<string, string>();
+    for (const e of all ?? []) {
+      if (!thumbs.has(e.body_part) && e.media) {
+        const u = thumbUrl(e);
+        if (u) thumbs.set(e.body_part, u);
+      }
+    }
+    return thumbs;
+  }, [all]);
+
   function openGroup(key: string) {
+    fx.tap();
     setBodyPart(key);
     setQuery("");
     setEquip(null);
@@ -94,6 +109,7 @@ export function ExercisePicker({
   }
 
   function pick(e: LibraryExercise) {
+    fx.pop();
     pushRecent(e.id);
     onPick(e);
   }
@@ -169,7 +185,11 @@ export function ExercisePicker({
             <div className="muscle-grid">
               {MUSCLE_GROUPS.map((g) => (
                 <button key={g.key} className="muscle-card" onClick={() => openGroup(g.key)}>
-                  <span className="muscle-icon">{g.icon}</span>
+                  {groupThumbs.get(g.key) ? (
+                    <img className="muscle-thumb" src={groupThumbs.get(g.key)} alt="" loading="lazy" />
+                  ) : (
+                    <span className="muscle-icon">{g.icon}</span>
+                  )}
                   <span className="muscle-name">{g.label}</span>
                   <span className="muscle-hint">{g.hint}</span>
                   <span className="muscle-count">{groupCounts.get(g.key) ?? 0}</span>

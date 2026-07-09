@@ -5,30 +5,35 @@
    ============================================================================ */
 
 :root {
-  /* Apple system neutrals (per the apple-ui-design guidelines); the matcha
-     accent stays — it's the brand, macro colors are information. */
+  /* Sharp light-only theme: iOS neutrals, one vivid green accent (interactive
+     elements only), fixed macro hues — color is information here. */
+  color-scheme: light;
   --canvas: #ffffff;
-  --surface: #f5f5f7;
-  --ink: #1d1d1f;
-  --ink-2: #86868b;
-  --line: #e8e8ed;
+  --surface: #f4f4f6;
+  --ink: #17171a;
+  --ink-2: #82828a;
+  --line: #e4e4ea;
 
-  --accent: #2f7a4d; /* matcha green — primary action, protein, master progress */
-  --accent-soft: #e7f0ea;
+  --accent: #16a34a; /* vivid green — every tappable/primary thing */
+  --accent-soft: #e5f6ec;
 
-  --protein: #2f7a4d;
-  --carbs: #e0a458;
-  --fat: #7c6ae0;
-  --calories: #1a1a1a;
+  --protein: #16a34a;
+  --carbs: #e8963e;
+  --fat: #7c5cf0;
+  --calories: #17171a;
 
-  --gold: #f2b705; /* streak / success */
+  --gold: #f5b800; /* streak / success */
   --rest: #9ca3af; /* rest day */
 
-  --radius: 18px;
-  --radius-sm: 12px;
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 8px 24px rgba(16, 24, 40, 0.06);
+  --radius: 16px; /* cards */
+  --radius-sm: 12px; /* buttons */
+  --radius-xs: 10px; /* inputs */
+  /* iOS shadow spec: crisp edge + soft diffusion + ambient spread */
+  --shadow: 0 1px 1px rgba(0, 0, 0, 0.04), 0 4px 8px rgba(0, 0, 0, 0.07), 0 12px 24px rgba(0, 0, 0, 0.04);
+  --shadow-float: 0 1px 2px rgba(0, 0, 0, 0.06), 0 8px 16px rgba(0, 0, 0, 0.12), 0 20px 40px rgba(0, 0, 0, 0.06);
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
-  --spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* playful overshoot — mode switch */
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* playful overshoot — toggles, presses */
+  --snappy: cubic-bezier(0.2, 0.9, 0.3, 1.1); /* quick crisp taps */
 }
 
 /* AI Coach mode wears its own skin: electric violet accents on a faintly
@@ -37,10 +42,20 @@
    is mounted. */
 :root[data-mode="ai"] {
   --canvas: #fdfcff;
-  --surface: #f6f4fc;
-  --line: #e9e5f5;
-  --accent: #6d4fd8;
-  --accent-soft: #eee9fb;
+  --surface: #f5f3fb;
+  --line: #e7e3f3;
+  --accent: #7c3aed;
+  --accent-soft: #f0e9fe;
+}
+
+/* Success micro-animation: brief non-blocking pop (banners, fresh checks). */
+@keyframes popIn {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.06); opacity: 1; }
+  100% { transform: scale(1); }
+}
+.pop-in {
+  animation: popIn 0.4s var(--spring);
 }
 
 * {
@@ -112,6 +127,12 @@ body::before {
 button {
   font-family: inherit;
   cursor: pointer;
+  /* iOS press physics: everything tappable depresses on touch-down with a
+     snappy spring — feedback at the moment of contact, not on release. */
+  transition: transform 0.16s var(--snappy);
+}
+button:active:not(:disabled) {
+  transform: scale(0.95);
 }
 
 input,
@@ -750,16 +771,31 @@ textarea {
    Chromium gets real edge refraction; Safari/Firefox get the frosted fallback.
    ============================================================================ */
 .glass {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.2));
+  position: relative;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.48), rgba(255, 255, 255, 0.22));
   box-shadow:
-    0 10px 30px rgba(16, 24, 40, 0.1),
+    0 12px 32px rgba(0, 0, 0, 0.1),
     inset 0 1px 1px rgba(255, 255, 255, 0.9),
-    inset 0 -10px 24px rgba(255, 255, 255, 0.18),
+    inset 0 -8px 20px rgba(255, 255, 255, 0.14),
     inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+}
+/* Specular glare — the fixed highlight from the repo's demo card recipe. */
+.glass::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    140px circle at 22% 12%,
+    rgba(255, 255, 255, 0.35),
+    rgba(255, 255, 255, 0.06) 45%,
+    transparent 70%
+  );
 }
 .glass.lg-fallback {
   /* iOS/Firefox frosted fallback: let the ambient color show through */
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.32));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.3));
 }
 
 /* ===== Live workout logger ===== */
@@ -1168,6 +1204,14 @@ textarea {
   font-size: 24px;
   margin-bottom: 4px;
 }
+.muscle-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  margin-bottom: 6px;
+}
 .muscle-name {
   font-weight: 700;
   font-size: 15px;
@@ -1395,7 +1439,7 @@ textarea {
 .plan-streak.on { opacity: 1; color: var(--gold); }
 .plan-streak.on b { color: var(--gold); }
 
-.badge-row { display: flex; gap: 10px; margin-top: 12px; }
+.badge-row { display: flex; gap: 12px; margin-top: 12px; }
 .badge {
   display: inline-flex;
   align-items: center;
@@ -1403,10 +1447,10 @@ textarea {
   font-size: 18px;
   filter: grayscale(1);
   opacity: 0.35;
-  transition: all 0.3s var(--ease);
+  transition: all 0.3s var(--spring);
 }
 .badge i { font-style: normal; font-size: 11px; color: var(--ink-2); font-weight: 700; }
-.badge.lit { filter: none; opacity: 1; transform: scale(1.05); }
+.badge.lit { filter: none; opacity: 1; transform: scale(1.1); }
 
 .plan-menu-backdrop { position: fixed; inset: 0; z-index: 45; }
 .plan-menu {
@@ -1642,16 +1686,19 @@ textarea {
   position: relative;
   z-index: 1;
   width: 42px;
-  text-align: center;
-  font-size: 17px;
-  filter: grayscale(1);
-  opacity: 0.45;
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+  opacity: 0.6;
   transition: all 0.3s var(--ease);
 }
 .mode-switch .mode-opt.on {
-  filter: none;
   opacity: 1;
-  transform: scale(1.08);
+  color: var(--ink);
+  transform: scale(1.12);
+}
+.mode-switch.ai .mode-opt.on {
+  color: #fff;
 }
 .mode-switch:active .mode-thumb {
   transform: scale(0.92);

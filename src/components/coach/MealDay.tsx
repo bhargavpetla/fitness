@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { updatePlanDay, addFoodLog, fetchDailyTotals } from "@/lib/db";
 import { fileToDataUrl, uploadPhoto, signedUrl } from "@/lib/photos";
+import { Icon } from "@/components/Icon";
+import { fx } from "@/lib/fx";
 import type { AiPlanDay, MealDayPayload, PlanMeal } from "@/lib/types";
 
 // One day of the meal plan: suggested dishes with photo, portion, macros
@@ -56,6 +58,8 @@ export function MealDay({
   async function toggleMeal(i: number) {
     const next = [...checked];
     next[i] = !next[i];
+    if (next[i]) fx.pop();
+    else fx.tap();
     await patch({ actual: { ...day.actual, checked: next } });
   }
 
@@ -86,6 +90,7 @@ export function MealDay({
       await patch({
         actual: { ...day.actual, checked: next, food_log_ids: [...(day.actual?.food_log_ids ?? []), log.id] },
       });
+      fx.pop();
       onToast("Logged into your day ✓");
     } catch {
       onToast("Could not log that meal.");
@@ -96,6 +101,7 @@ export function MealDay({
 
   async function completeDay() {
     await patch({ completed: true, completed_at: new Date().toISOString() });
+    fx.success();
     onToast(`Day ${day.day_index} complete 🎉`);
   }
 
@@ -145,7 +151,11 @@ export function MealDay({
         <div className="day-actions">
           <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={pickPhoto} />
           <button className="btn btn-ghost" onClick={() => fileRef.current?.click()} disabled={busy === "photo"}>
-            {busy === "photo" ? <span className="spinner" style={{ borderTopColor: "var(--accent)" }} /> : photoUrl ? "📷 Retake day photo" : "📷 Add a day photo"}
+            {busy === "photo" ? (
+              <span className="spinner" style={{ borderTopColor: "var(--accent)" }} />
+            ) : (
+              <><Icon name="camera-outline" size={16} /> {photoUrl ? "Retake day photo" : "Add a day photo"}</>
+            )}
           </button>
           {photoUrl && <img className="day-photo" src={photoUrl} alt="Your day" />}
           {!day.completed ? (
@@ -153,7 +163,7 @@ export function MealDay({
               ✓ Complete day {day.day_index}
             </button>
           ) : (
-            <div className="day-done-banner">🎉 Day {day.day_index} done — see you tomorrow</div>
+            <div className="day-done-banner pop-in">🎉 Day {day.day_index} done — see you tomorrow</div>
           )}
         </div>
       )}
@@ -208,8 +218,8 @@ function MealCard({
 
       <div className="meal-card-foot">
         {meal.recipe && meal.recipe.steps.length > 0 && (
-          <button className="meal-mini-btn" onClick={() => setShowRecipe((v) => !v)}>
-            👩‍🍳 Recipe {meal.recipe.time_min ? `· ${meal.recipe.time_min} min` : ""} {showRecipe ? "▴" : "▾"}
+          <button className="meal-mini-btn" onClick={() => { fx.tap(); setShowRecipe((v) => !v); }}>
+            <Icon name="restaurant-outline" size={13} /> Recipe {meal.recipe.time_min ? `· ${meal.recipe.time_min} min` : ""} {showRecipe ? "▴" : "▾"}
           </button>
         )}
         {!locked && (
@@ -272,6 +282,11 @@ function DishImage({ imageKey, src }: { imageKey?: string | null; src?: string |
     };
   }, [imageKey, src]);
 
-  if (!url || failed) return <div className="meal-img ph">🍛</div>;
+  if (!url || failed)
+    return (
+      <div className="meal-img ph">
+        <Icon name="restaurant-outline" size={24} />
+      </div>
+    );
   return <img className="meal-img" src={url} alt="" loading="lazy" onError={() => setFailed(true)} />;
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updatePlanDay, addExerciseLog } from "@/lib/db";
 import { thumbUrlFromKey, MEDIA_ATTRIBUTION } from "@/lib/exerciseLibrary";
+import { fx } from "@/lib/fx";
 import type { AiPlanDay, WorkoutDayPayload, PlanExercise, ParsedExercise } from "@/lib/types";
 
 // One day of the training plan: the suggested workout with animations and
@@ -56,6 +57,7 @@ export function WorkoutDay({
       };
       await addExerciseLog({ date: day.date, parsed, raw_input: "AI Coach: rest day" });
       await patch({ completed: true, completed_at: new Date().toISOString() });
+      fx.pop();
       onToast("Rest day banked 😌");
     } finally {
       setBusy(false);
@@ -81,6 +83,7 @@ export function WorkoutDay({
         completed_at: new Date().toISOString(),
         actual: { ...day.actual, unexpected_rest: true },
       });
+      fx.remove();
       onToast("Rest taken 😌 — reshuffling your week…");
       await onReplan?.();
     } finally {
@@ -123,6 +126,7 @@ export function WorkoutDay({
         completed_at: new Date().toISOString(),
         actual: { ...day.actual, exercise_log_id: log.id },
       });
+      fx.success();
       onToast(`Day ${day.day_index} logged 💪`);
       router.push(`/workout/${log.id}`);
     } catch {
@@ -214,7 +218,7 @@ export function WorkoutDay({
               </button>
             </>
           ) : (
-            <div className="day-done-banner">
+            <div className="day-done-banner pop-in">
               💪 Day {day.day_index} logged
               {day.actual?.exercise_log_id && (
                 <button className="meal-mini-btn" onClick={() => router.push(`/workout/${day.actual!.exercise_log_id}`)}>

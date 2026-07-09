@@ -17,6 +17,7 @@ import {
   type NormalizedExercise,
 } from "@/lib/workout";
 import { getExerciseImage } from "@/lib/exerciseImage";
+import { Icon } from "@/components/Icon";
 import { BodyMap } from "@/components/BodyMap";
 import { prettyDate } from "@/lib/date";
 import type { ExerciseLog, Profile, WorkoutIntelligence } from "@/lib/types";
@@ -130,7 +131,7 @@ export default function WorkoutDetailPage() {
 
         {/* Stat chips */}
         <div className="wd-chips">
-          <StatChip icon="📅" big={prettyDate(log.date)} small={when.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} />
+          <StatChip icon="🗓" big={prettyDate(log.date)} small={when.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })} />
           <StatChip icon="⏱" big={`${parsed.est_duration_min ?? "—"} min`} small="Duration" />
           <StatChip icon="🔥" big={`${parsed.est_calories != null ? Math.round(Number(parsed.est_calories)) : "—"} kcal`} small="Estimated" />
         </div>
@@ -214,7 +215,7 @@ export default function WorkoutDetailPage() {
         {/* AI Coach */}
         <section className="wd-card">
           <button className="btn btn-primary" style={{ width: "100%" }} onClick={() => { setShowNarrative(true); if (!intel?.narrative) loadIntelligence(false); }} disabled={intelBusy}>
-            {intelBusy && !intel?.narrative ? <span className="spinner" /> : "✨ Explain My Workout"}
+            {intelBusy && !intel?.narrative ? <span className="spinner" /> : <><Icon name="flash-outline" size={16} /> Explain My Workout</>}
           </button>
           {showNarrative && intel?.narrative && (
             <div className="wd-narrative">{intel.narrative}</div>

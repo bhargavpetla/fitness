@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { MainApp } from "@/components/MainApp";
 import { CoachHome } from "@/components/coach/CoachHome";
+import { Icon } from "@/components/Icon";
 import { fetchStreak } from "@/lib/db";
 import { getMode, setMode, coachUnlocked, type AppMode } from "@/lib/mode";
 
@@ -51,7 +52,9 @@ export function ModeGate() {
     <>
       {wash && (
         <div className={`mode-wash ${wash}`} aria-hidden>
-          <span className="mode-wash-icon">{wash === "ai" ? "✨" : "✍️"}</span>
+          <span className="mode-wash-icon" style={{ color: "#fff" }}>
+            <Icon name={wash === "ai" ? "flash-outline" : "create-outline"} size={64} />
+          </span>
         </div>
       )}
       {mode === "ai" ? (
