@@ -197,6 +197,28 @@ export interface CustomExercise {
 export type PlanKind = "meal" | "workout";
 export type PlanStatus = "active" | "stopped" | "completed";
 
+// Asked before generating a plan.
+export interface PlanPrefs {
+  cheat_meals?: number; // per week, meal plans
+  rest_days?: number; // per week, workout plans
+}
+
+// Collected when a week ends; shapes the next plan.
+export interface PlanFeedback {
+  intensity?: "less" | "same" | "more"; // workout plans
+  food?: "lighter" | "same" | "more"; // meal plans
+  liked?: boolean;
+  note?: string;
+}
+
+export interface PlanMeta {
+  prefs?: PlanPrefs;
+  feedback?: PlanFeedback;
+  goal_snapshot?: { calories: number; protein_g: number };
+  adjusted_at?: string; // last time remaining days were re-planned
+  [key: string]: unknown;
+}
+
 export interface AiPlan {
   id: string;
   user_id: string;
@@ -205,7 +227,7 @@ export interface AiPlan {
   start_date: string;
   end_date: string;
   context_summary: string | null; // what the AI understood from the 30-day history
-  meta: Record<string, unknown> | null;
+  meta: PlanMeta | null;
   created_at: string;
 }
 
@@ -265,6 +287,7 @@ export interface AiPlanDay {
     checked?: boolean[]; // per-meal ticks
     exercise_log_id?: string; // workout logged into the real tracker
     food_log_ids?: string[]; // meals logged into the real tracker
+    unexpected_rest?: boolean; // planned workout swapped for rest on the day
   } | null;
 }
 

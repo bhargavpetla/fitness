@@ -1702,6 +1702,33 @@ textarea {
   color: #fff;
 }
 
+/* Pre-generation questions + end-of-week feedback */
+.setup-q {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  margin: 4px 0;
+}
+.setup-q-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-2);
+  margin-bottom: 6px;
+}
+.feedback-card {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: var(--shadow);
+}
+.feedback-card .pill {
+  background: var(--canvas);
+}
+.feedback-card .pill.on {
+  background: var(--accent);
+}
+
 /* Two-way data sync indicator on plan days */
 .sync-chip {
   display: inline-flex;

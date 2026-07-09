@@ -54,10 +54,9 @@ export interface Milestone {
 }
 
 export const MILESTONES: Milestone[] = [
-  { at: 7, emoji: "🥉", label: "1 week" },
-  { at: 14, emoji: "🥈", label: "2 weeks" },
-  { at: 21, emoji: "🥇", label: "3 weeks" },
-  { at: 30, emoji: "🏆", label: "full month" },
+  { at: 3, emoji: "🥉", label: "3 days" },
+  { at: 5, emoji: "🥈", label: "5 days" },
+  { at: 7, emoji: "🏆", label: "full week" },
 ];
 
 export function isPlanOver(plan: AiPlan): boolean {

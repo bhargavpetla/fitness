@@ -14,12 +14,14 @@ export function PlanHeader({
   onStop,
   onDelete,
   onRegenerate,
+  onAdjust,
 }: {
   plan: AiPlan;
   days: AiPlanDay[];
   onStop: () => void;
   onDelete: () => void;
   onRegenerate: () => void;
+  onAdjust: () => void;
 }) {
   const [menu, setMenu] = useState(false);
   const done = completedCount(days);
@@ -31,7 +33,7 @@ export function PlanHeader({
     <div className="plan-head card" style={{ animation: "none" }}>
       <div className="card-top">
         <div>
-          <div className="meal">{plan.kind === "meal" ? "30-day meal plan" : "30-day training plan"}</div>
+          <div className="meal">{plan.kind === "meal" ? "This week's meals" : "This week's training"}</div>
           <div className="sub">{prettyDate(plan.start_date)} → {prettyDate(plan.end_date)}</div>
         </div>
         <div style={{ position: "relative", flex: "0 0 auto" }}>
@@ -40,7 +42,8 @@ export function PlanHeader({
             <>
               <div className="plan-menu-backdrop" onClick={() => setMenu(false)} />
               <div className="plan-menu">
-                <button onClick={() => { setMenu(false); onRegenerate(); }}>↺ New plan (replaces this one)</button>
+                <button onClick={() => { setMenu(false); onAdjust(); }}>⤺ Adjust remaining days</button>
+                <button onClick={() => { setMenu(false); onRegenerate(); }}>↺ New week (replaces this one)</button>
                 <button onClick={() => { setMenu(false); onStop(); }}>⏸ Stop plan</button>
                 <button className="danger" onClick={() => { setMenu(false); onDelete(); }}>🗑 Delete plan</button>
               </div>

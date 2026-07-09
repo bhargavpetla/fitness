@@ -22,11 +22,13 @@ export function WorkoutDay({
   locked,
   onUpdated,
   onToast,
+  onReplan,
 }: {
   day: AiPlanDay;
   locked: boolean;
   onUpdated: (d: AiPlanDay) => void;
   onToast: (msg: string) => void;
+  onReplan?: () => Promise<void> | void;
 }) {
   const router = useRouter();
   const payload = day.payload as WorkoutDayPayload;
@@ -55,6 +57,32 @@ export function WorkoutDay({
       await addExerciseLog({ date: day.date, parsed, raw_input: "AI Coach: rest day" });
       await patch({ completed: true, completed_at: new Date().toISOString() });
       onToast("Rest day banked 😌");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  // Life happened — a planned workout becomes rest, and the coach reshuffles
+  // the remaining days so the missed muscles aren't dropped from the week.
+  async function unexpectedRest() {
+    if (!confirm("Turn this into a rest day? The coach will reshuffle your remaining days around it.")) return;
+    setBusy(true);
+    try {
+      const parsed: ParsedExercise = {
+        type: "rest",
+        exercises: [],
+        cardio: null,
+        est_calories: null,
+        summary: `Unexpected rest — planned ${payload.name} moved along the week.`,
+      };
+      await addExerciseLog({ date: day.date, parsed, raw_input: "AI Coach: unexpected rest day" });
+      await patch({
+        completed: true,
+        completed_at: new Date().toISOString(),
+        actual: { ...day.actual, unexpected_rest: true },
+      });
+      onToast("Rest taken 😌 — reshuffling your week…");
+      await onReplan?.();
     } finally {
       setBusy(false);
     }
@@ -180,6 +208,9 @@ export function WorkoutDay({
               </button>
               <button className="btn btn-primary" onClick={logWorkout} disabled={busy}>
                 {busy ? <span className="spinner" /> : adjusting ? "✓ Log what I did" : "✓ Did it — log workout"}
+              </button>
+              <button className="live-ex-remove" onClick={unexpectedRest} disabled={busy}>
+                😴 Couldn&apos;t make it — take a rest day instead
               </button>
             </>
           ) : (

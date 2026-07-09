@@ -329,6 +329,26 @@ export async function setPlanStatus(id: string, status: "stopped" | "completed")
   await sb.from("ai_plans").update({ status }).eq("id", id);
 }
 
+export async function updatePlanMeta(id: string, meta: AiPlan["meta"]): Promise<void> {
+  const sb = createClient();
+  await sb.from("ai_plans").update({ meta }).eq("id", id);
+}
+
+// Most recent plan of a kind that isn't the active one — its feedback shapes
+// the next week's generation.
+export async function fetchLatestEndedPlan(kind: PlanKind): Promise<AiPlan | null> {
+  const sb = createClient();
+  const { data } = await sb
+    .from("ai_plans")
+    .select("*")
+    .eq("kind", kind)
+    .neq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return (data as AiPlan) ?? null;
+}
+
 export async function deletePlan(id: string): Promise<void> {
   const sb = createClient();
   await sb.from("ai_plans").delete().eq("id", id);

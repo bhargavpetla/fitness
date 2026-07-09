@@ -8,12 +8,12 @@ import { ModeSwitch } from "@/components/ModeSwitch";
 import { PlanHeader } from "./PlanHeader";
 import { MealDay } from "./MealDay";
 import { WorkoutDay } from "./WorkoutDay";
-import { fetchActivePlan, fetchPlanDays, setPlanStatus, deletePlan, fetchStreak } from "@/lib/db";
-import { todayIndex } from "@/lib/planProgress";
+import { fetchActivePlan, fetchPlanDays, setPlanStatus, deletePlan, fetchStreak, updatePlanMeta } from "@/lib/db";
+import { todayIndex, isPlanOver, completedCount } from "@/lib/planProgress";
 import { setMode, coachUnlocked, unlockProgress, UNLOCK_DAYS } from "@/lib/mode";
 import { useLiquidGlass } from "@/lib/liquidGlass";
 import { todayStr, prettyDate } from "@/lib/date";
-import type { AiPlan, AiPlanDay, PlanKind } from "@/lib/types";
+import type { AiPlan, AiPlanDay, PlanKind, PlanFeedback } from "@/lib/types";
 
 // The AI Coach: the app's second personality. Earned after a 7-day logging
 // streak, entered through the mode switch, themed violet, and built around
@@ -82,32 +82,28 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
     load();
   }, [load]);
 
-  // A full month in one AI call outlasts the serverless window, so the plan is
-  // generated in two halves. If the second half fails, the plan survives as
-  // partial and "Finish weeks 3–4" resumes it.
-  async function callGenerate(part: 1 | 2, planId?: string): Promise<{ plan_id: string }> {
-    const res = await fetch("/api/plan/generate", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ kind, part, plan_id: planId }),
-    });
-    const json = await res.json().catch(() => null);
-    if (!res.ok) throw new Error(json?.error ?? "Could not generate the plan.");
-    return json as { plan_id: string };
-  }
+  // Pre-generation questions: cheat meals for the week (meal plans) and rest
+  // days (training plans). Sent with the request and remembered on the plan.
+  const [cheatMeals, setCheatMeals] = useState(1);
+  const [restDays, setRestDays] = useState(2);
 
   async function generate() {
-    setGenerating("Planning weeks 1–2…");
+    setGenerating(
+      kind === "meal" ? "Reading your month of meals, planning your week…" : "Studying your lifts, planning your week…"
+    );
     try {
-      const p1 = await callGenerate(1);
-      setGenerating("Weeks 1–2 done. Planning weeks 3–4…");
-      try {
-        await callGenerate(2, p1.plan_id);
-        setToast(kind === "meal" ? "Your 30-day meal plan is ready 🍛" : "Your 30-day training plan is ready 💪");
-      } catch {
-        setToast("Weeks 1–2 are ready; weeks 3–4 didn't finish. Tap 'Finish plan' to complete it.");
-      }
+      const res = await fetch("/api/plan/generate", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          kind,
+          prefs: kind === "meal" ? { cheat_meals: cheatMeals } : { rest_days: restDays },
+        }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error ?? "Could not generate the plan.");
       await load();
+      setToast(kind === "meal" ? "Your week of meals is ready 🍛" : "Your training week is ready 💪");
     } catch (e) {
       setToast((e as Error).message);
     } finally {
@@ -115,18 +111,36 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
     }
   }
 
-  async function finishPartial() {
+  // Re-plans the remaining days around what actually happened (missed days,
+  // unexpected rests). Past days are never touched.
+  async function adjust() {
     if (!plan) return;
-    setGenerating("Planning weeks 3–4…");
+    setGenerating("Reshuffling your remaining days…");
     try {
-      await callGenerate(2, plan.id);
+      const res = await fetch("/api/plan/adjust", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ plan_id: plan.id }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(json?.error ?? "Could not adjust the plan.");
       await load();
-      setToast("Plan complete — all 30 days ready ✓");
+      setToast("Week adjusted around how it's actually going ⤺");
     } catch (e) {
       setToast((e as Error).message);
     } finally {
       setGenerating(null);
     }
+  }
+
+  // End-of-week feedback: saved onto the finished plan, read by the next
+  // generation so week two actually responds to week one.
+  async function submitFeedback(fb: PlanFeedback) {
+    if (!plan) return;
+    await updatePlanMeta(plan.id, { ...(plan.meta ?? {}), feedback: fb });
+    await setPlanStatus(plan.id, "completed");
+    await load();
+    setToast("Noted — your next week will be tuned to that 🎯");
   }
 
   async function stop() {
@@ -206,28 +220,50 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
         ) : !plan ? (
           <div className="coach-hero">
             <div className="coach-hero-icon">{kind === "meal" ? "🍛" : "📈"}</div>
-            <h2>{kind === "meal" ? "A month of meals, made for you" : "A month of training, built on your lifts"}</h2>
+            <h2>{kind === "meal" ? "A week of meals, made for you" : "A week of training, built on your lifts"}</h2>
             <p className="muted">
               {kind === "meal"
-                ? "The coach reads your last 30 days of logged meals — your staples, your cuisine, your rhythm — and plans the next 30 to hit your goal. Every day: real dishes with photos, portions, macros, and recipes."
-                : "The coach studies your last 30 days of workouts and plans the next 30 with progressive overload — small, earned jumps in weight and reps, rest days included. Every exercise comes with its animation."}
+                ? "The coach reads your last 30 days of logged meals — your staples, your cuisine, your rhythm — and plans the next 7 to hit your goal. Real dishes with photos, portions, macros, and recipes."
+                : "The coach studies your last 30 days of workouts and plans the next 7 with progressive overload — small, earned jumps in weight and reps. Every exercise comes with its animation."}
             </p>
+
+            {kind === "meal" ? (
+              <div className="setup-q">
+                <span className="setup-q-label">Cheat meals this week?</span>
+                <div className="pill-group" style={{ justifyContent: "center" }}>
+                  {[0, 1, 2, 3].map((n) => (
+                    <button key={n} className={`pill ${cheatMeals === n ? "on" : ""}`} onClick={() => setCheatMeals(n)}>
+                      {n === 0 ? "None" : `${n} 🎉`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="setup-q">
+                <span className="setup-q-label">Rest days this week?</span>
+                <div className="pill-group" style={{ justifyContent: "center" }}>
+                  {[1, 2, 3, 4].map((n) => (
+                    <button key={n} className={`pill ${restDays === n ? "on" : ""}`} onClick={() => setRestDays(n)}>
+                      {n} 😌
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <p className="muted" style={{ fontSize: 13 }}>
-              Fully optional and separate from your manual logging. Stop or delete it anytime.
+              A fresh week every 7 days, tuned by your feedback. Stop or delete it anytime.
             </p>
             <button className="btn btn-primary" onClick={generate}>
-              ✨ Generate my 30-day plan
+              ✨ Plan my week
             </button>
           </div>
         ) : (
           <>
-            <PlanHeader plan={plan} days={days} onStop={stop} onDelete={remove} onRegenerate={generate} />
+            <PlanHeader plan={plan} days={days} onStop={stop} onDelete={remove} onRegenerate={generate} onAdjust={adjust} />
 
-            {Boolean((plan.meta as { partial?: boolean } | null)?.partial) && days.length < 30 && (
-              <div className="plan-note" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                <span>Weeks 3–4 aren&apos;t generated yet.</span>
-                <button className="meal-mini-btn log" onClick={finishPartial}>Finish plan ›</button>
-              </div>
+            {isPlanOver(plan) && !plan.meta?.feedback && (
+              <FeedbackCard kind={kind} completed={completedCount(days)} total={days.length} onSubmit={submitFeedback} />
             )}
 
             {plan.context_summary && (
@@ -252,7 +288,7 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
               ))}
             </div>
 
-            {day && (
+            {day && !isPlanOver(plan) && (
               <>
                 <div className="day-title">
                   <span>Day {day.day_index} · {prettyDate(day.date)}</span>
@@ -273,6 +309,7 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
                     locked={day.date > today}
                     onUpdated={(nd) => setDays((ds) => ds.map((x) => (x.id === nd.id ? nd : x)))}
                     onToast={setToast}
+                    onReplan={adjust}
                   />
                 )}
               </>
@@ -280,6 +317,70 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// End-of-week check-in. The answers are stored on the finished plan and fed
+// into the next week's generation, so the plan actually listens.
+function FeedbackCard({
+  kind,
+  completed,
+  total,
+  onSubmit,
+}: {
+  kind: PlanKind;
+  completed: number;
+  total: number;
+  onSubmit: (fb: PlanFeedback) => void;
+}) {
+  const [liked, setLiked] = useState<boolean | null>(null);
+  const [tune, setTune] = useState<"less" | "same" | "more">("same");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const tuneLabels: Record<"less" | "same" | "more", string> =
+    kind === "workout"
+      ? { less: "Easier", same: "Same", more: "More intensity" }
+      : { less: "Lighter meals", same: "Same", more: "More food" };
+
+  async function save() {
+    setBusy(true);
+    const fb: PlanFeedback = { liked: liked ?? undefined, note: note.trim() || undefined };
+    if (kind === "workout") fb.intensity = tune;
+    else fb.food = tune === "less" ? "lighter" : tune;
+    await onSubmit(fb);
+  }
+
+  return (
+    <div className="card feedback-card" style={{ animation: "none" }}>
+      <div className="meal">Week done — {completed}/{total} days {completed === total ? "🏆" : "🎉"}</div>
+      <p className="sub" style={{ marginBottom: 10 }}>Tell the coach how it went; next week adapts to this.</p>
+
+      <span className="setup-q-label">Did you like this week?</span>
+      <div className="pill-group" style={{ marginBottom: 10 }}>
+        <button className={`pill ${liked === true ? "on" : ""}`} onClick={() => setLiked(true)}>👍 Loved it</button>
+        <button className={`pill ${liked === false ? "on" : ""}`} onClick={() => setLiked(false)}>👎 Not really</button>
+      </div>
+
+      <span className="setup-q-label">{kind === "workout" ? "Intensity next week?" : "Food next week?"}</span>
+      <div className="pill-group" style={{ marginBottom: 10 }}>
+        {(["less", "same", "more"] as const).map((t) => (
+          <button key={t} className={`pill ${tune === t ? "on" : ""}`} onClick={() => setTune(t)}>
+            {tuneLabels[t]}
+          </button>
+        ))}
+      </div>
+
+      <input
+        className="field"
+        placeholder="Anything else? (optional — e.g. 'more paneer', 'shorter workouts')"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+      />
+      <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={save} disabled={busy}>
+        {busy ? <span className="spinner" /> : "Save — set up next week ›"}
+      </button>
     </div>
   );
 }

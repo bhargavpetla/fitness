@@ -298,19 +298,22 @@ export interface RawMealPlan {
 }
 
 export async function generateMealPlan(input: {
-  dayFrom: number; // plans are generated in halves to fit serverless timeouts
+  dayFrom: number;
   dayTo: number;
+  totalDays: number;
   historyDigest: string;
   goalText: string;
   profileNote: string;
   indbTable: string;
-  continuityNote?: string; // for the second half: what the first half planned
+  prefsNote?: string; // e.g. cheat meals per week
+  feedbackNote?: string; // last week's feedback, so the next week adapts
+  continuityNote?: string; // what's already planned/happened (adjustments)
 }): Promise<RawMealPlan> {
   const env = serverEnv();
   const ai = genai();
   const count = input.dayTo - input.dayFrom + 1;
 
-  const system = `You are an Indian nutrition coach building days ${input.dayFrom}–${input.dayTo} of a 30-day meal plan. Return STRICT JSON only.
+  const system = `You are an Indian nutrition coach building days ${input.dayFrom}–${input.dayTo} of a ${input.totalDays}-day meal plan. Return STRICT JSON only.
 
 You are given:
 1. A digest of what the user ACTUALLY ate over the last 30 days — mirror their food culture, staples, and meal rhythm. Do not impose foreign cuisines; evolve what they already eat toward their goal.
@@ -320,7 +323,9 @@ You are given:
 Rules:
 - Exactly ${count} days, numbered ${input.dayFrom} to ${input.dayTo}, meals per day: breakfast, lunch, snack, dinner.
 - Sum each day's calories: keep the total within ±7% of the calorie goal and protein at or above the protein goal.
-- VARIETY is sacred: never repeat a main dish within any 4-day window; rotate regional styles across the weeks.
+- If cheat meals are requested, schedule exactly that many per week: one indulgent meal the user will love (start its desc with 🎉), placed on spread-out days; keep a cheat day's total within +15% of the goal by lightening its other meals.
+- If feedback from last week is given, adapt visibly: "more food" → bigger, more satisfying portions within goal; "lighter" → lighter meals; honor any note.
+- VARIETY is sacred: never repeat a main dish within any 4-day window; rotate regional styles.
 - "portion": concrete Indian household measures ("2 rotis + 1 katori dal", "1 bowl (200g)").
 - "desc": max 12 words, appetizing, plain language.
 - "note": optional one-line coach tip on ~2 days per week.
@@ -330,7 +335,7 @@ Return JSON shaped exactly:
 { "context_summary": "<3-4 sentences on their eating pattern and how this plan fits>",
   "days": [ { "day": ${input.dayFrom}, "note": "...", "meals": [ { "slot": "breakfast", "name": string, "desc": string, "portion": string, "calories": number, "protein_g": number, "carbs_g": number, "fat_g": number, "verified": boolean } ] } ] }`;
 
-  const user = `MY LAST 30 DAYS OF MEALS:\n${input.historyDigest}\n\nMY DAILY GOAL:\n${input.goalText}\n\nABOUT ME: ${input.profileNote}\n${input.continuityNote ? `\nALREADY PLANNED (days ${input.dayFrom - 1} and earlier — do not repeat their main dishes in the first 3 days you plan, and keep the same overall style):\n${input.continuityNote}\n` : ""}\nMEASURED INDIAN DISH MACROS (name | serving | kcal | macros):\n${input.indbTable}`;
+  const user = `MY LAST 30 DAYS OF MEALS:\n${input.historyDigest}\n\nMY DAILY GOAL:\n${input.goalText}\n\nABOUT ME: ${input.profileNote}\n${input.prefsNote ? `\nMY PREFERENCES: ${input.prefsNote}\n` : ""}${input.feedbackNote ? `\nMY FEEDBACK ON LAST WEEK: ${input.feedbackNote}\n` : ""}${input.continuityNote ? `\nCONTEXT — ALREADY PLANNED / WHAT ACTUALLY HAPPENED (adapt around this, don't repeat recent main dishes):\n${input.continuityNote}\n` : ""}\nMEASURED INDIAN DISH MACROS (name | serving | kcal | macros):\n${input.indbTable}`;
 
   const res = await ai.models.generateContent({
     model: env.geminiFoodModel,
@@ -367,23 +372,28 @@ export interface RawWorkoutPlan {
 export async function generateWorkoutPlan(input: {
   dayFrom: number;
   dayTo: number;
+  totalDays: number;
   historyDigest: string;
   configText: string;
   profileNote: string;
-  continuityNote?: string;
+  prefsNote?: string; // e.g. rest days per week
+  feedbackNote?: string; // last week's feedback (intensity up/down)
+  continuityNote?: string; // what's already planned/happened (adjustments)
 }): Promise<RawWorkoutPlan> {
   const env = serverEnv();
   const ai = genai();
   const count = input.dayTo - input.dayFrom + 1;
 
-  const system = `You are a strength coach building days ${input.dayFrom}–${input.dayTo} of a 30-day training plan around PROGRESSIVE OVERLOAD. Return STRICT JSON only.
+  const system = `You are a strength coach building days ${input.dayFrom}–${input.dayTo} of a ${input.totalDays}-day training plan around PROGRESSIVE OVERLOAD. Return STRICT JSON only.
 
 You are given the user's actual workouts from the last 30 days (exercises, sets × reps @ kg) and their weekly session target. Build on THEIR lifts and THEIR working weights — never prescribe a jump bigger than +2.5kg or +1-2 reps over what they demonstrably handle.
 
 Rules:
-- Exactly ${count} days, numbered ${input.dayFrom} to ${input.dayTo}; respect their weekly session target with the rest spread sensibly (kind "rest", no exercises).
+- Exactly ${count} days, numbered ${input.dayFrom} to ${input.dayTo}; if a number of rest days is requested, schedule exactly that many rest days (kind "rest", no exercises), spread sensibly — never two hard sessions on muscles that haven't recovered.
+- If context says a planned workout was missed or swapped for an unexpected rest day, don't drop that muscle group — reshuffle the remaining days so the split still covers everything without doubling fatigue.
+- If feedback from last week is given, adapt visibly: "more" intensity → slightly heavier or +1 set on key lifts; "less" → trim a set or lighten loads; honor any note.
 - Use a coherent split inferred from their history (e.g. Push/Pull/Legs, Upper/Lower).
-- Week-over-week progression on repeated exercises: small weight or rep bumps; every 4th week slightly lighter (deload flavor).
+- Progression on repeated exercises: small weight or rep bumps over what they last did.
 - 4-7 exercises per workout. Prefer the exact exercise names they already do; add close variations for balance (use common gym names — they are matched to an animation library).
 - weight_kg: their realistic working weight, or null for bodyweight moves.
 - "note": short cue when something changed ("up 2.5kg from last week", "same weight, +1 rep").
@@ -393,7 +403,7 @@ Return JSON shaped exactly:
 { "context_summary": "<3-4 sentences on their training pattern and the plan's logic>",
   "days": [ { "day": ${input.dayFrom}, "kind": "workout", "name": "Push Day", "focus": ["Chest","Triceps"], "note": "...", "exercises": [ { "name": string, "sets": number, "reps": number, "weight_kg": number|null, "note": string } ] } ] }`;
 
-  const user = `MY LAST 30 DAYS OF TRAINING:\n${input.historyDigest}\n\nMY SETUP:\n${input.configText}\n\nABOUT ME: ${input.profileNote}${input.continuityNote ? `\n\nALREADY PLANNED (the first half of this plan — continue its split rotation and progress its weights, do not reset):\n${input.continuityNote}` : ""}`;
+  const user = `MY LAST 30 DAYS OF TRAINING:\n${input.historyDigest}\n\nMY SETUP:\n${input.configText}\n\nABOUT ME: ${input.profileNote}${input.prefsNote ? `\n\nMY PREFERENCES: ${input.prefsNote}` : ""}${input.feedbackNote ? `\n\nMY FEEDBACK ON LAST WEEK: ${input.feedbackNote}` : ""}${input.continuityNote ? `\n\nCONTEXT — ALREADY PLANNED / WHAT ACTUALLY HAPPENED THIS WEEK (reshuffle the remaining days around this):\n${input.continuityNote}` : ""}`;
 
   const res = await ai.models.generateContent({
     model: env.geminiExerciseModel,
