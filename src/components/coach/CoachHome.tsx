@@ -1,24 +1,58 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Toast } from "@/components/Toast";
 import { LoadingJoke } from "@/components/LoadingJoke";
+import { ModeSwitch } from "@/components/ModeSwitch";
 import { PlanHeader } from "./PlanHeader";
 import { MealDay } from "./MealDay";
 import { WorkoutDay } from "./WorkoutDay";
-import { fetchActivePlan, fetchPlanDays, setPlanStatus, deletePlan } from "@/lib/db";
+import { fetchActivePlan, fetchPlanDays, setPlanStatus, deletePlan, fetchStreak } from "@/lib/db";
 import { todayIndex } from "@/lib/planProgress";
+import { setMode, coachUnlocked, unlockProgress, UNLOCK_DAYS } from "@/lib/mode";
+import { useLiquidGlass } from "@/lib/liquidGlass";
 import { todayStr, prettyDate } from "@/lib/date";
 import type { AiPlan, AiPlanDay, PlanKind } from "@/lib/types";
 
-// The AI Coach space (/coach): a place apart from manual logging where the AI
-// builds 30-day meal and training plans from the user's own last 30 days,
-// and each day becomes a small gamified check-in.
+// The AI Coach: the app's second personality. Earned after a 7-day logging
+// streak, entered through the mode switch, themed violet, and built around
+// 30-day meal/training plans generated from the user's own last 30 days.
+// All logging lands in the same tables as manual mode — data is one.
 
-export function CoachHome() {
+export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
   const router = useRouter();
   const [kind, setKind] = useState<PlanKind>("meal");
+  const [access, setAccess] = useState<"checking" | "locked" | "open">("checking");
+  const [unlockDays, setUnlockDays] = useState(0);
+  const topbarRef = useRef<HTMLDivElement>(null);
+  useLiquidGlass(topbarRef, { scale: -60, blur: 4, fallbackBlur: 14 });
+
+  // The whole page wears the AI theme while the Coach is mounted.
+  useEffect(() => {
+    document.documentElement.dataset.mode = "ai";
+    return () => {
+      delete document.documentElement.dataset.mode;
+    };
+  }, []);
+
+  // Direct /coach visits still respect the 7-day unlock.
+  useEffect(() => {
+    fetchStreak()
+      .then((s) => {
+        setUnlockDays(unlockProgress(s));
+        setAccess(coachUnlocked(s) ? "open" : "locked");
+      })
+      .catch(() => setAccess("locked"));
+  }, []);
+
+  function switchToManual() {
+    if (onSwitchMode) onSwitchMode();
+    else {
+      setMode("manual");
+      router.push("/");
+    }
+  }
   const [plan, setPlan] = useState<AiPlan | null>(null);
   const [days, setDays] = useState<AiPlanDay[]>([]);
   const [loading, setLoading] = useState(true);
@@ -110,14 +144,49 @@ export function CoachHome() {
   const day = days[sel] ?? null;
   const today = todayStr();
 
+  if (access !== "open") {
+    return (
+      <div className="app-shell">
+        <div className="topbar">
+          <span className="daycount">AI Coach ✨</span>
+        </div>
+        <div className="coach-hero">
+          {access === "checking" ? (
+            <span className="spinner" style={{ borderTopColor: "var(--accent)" }} />
+          ) : (
+            <>
+              <div className="coach-hero-icon">🔒</div>
+              <h2>The Coach is earned</h2>
+              <p className="muted">
+                Log for {UNLOCK_DAYS} days in a row and the AI Coach unlocks — it needs to watch how you
+                actually eat and train before it starts planning for you.
+              </p>
+              <div className="unlock-dots" aria-label={`${unlockDays} of ${UNLOCK_DAYS} days`}>
+                {Array.from({ length: UNLOCK_DAYS }, (_, i) => (
+                  <span key={i} className={`unlock-dot ${i < unlockDays ? "on" : ""}`}>
+                    {i < unlockDays ? "✓" : i + 1}
+                  </span>
+                ))}
+              </div>
+              <p className="muted" style={{ fontSize: 13 }}>{unlockDays} of {UNLOCK_DAYS} days — keep going 🔥</p>
+              <button className="btn btn-primary" onClick={switchToManual}>Back to tracking</button>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app-shell">
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
 
-      <div className="topbar">
-        <button className="icon-btn" onClick={() => router.push("/")} aria-label="Back">‹</button>
+      <div className="topbar glass topbar-sticky" ref={topbarRef}>
         <span className="daycount">AI Coach ✨</span>
-        <span style={{ width: 38 }} />
+        <ModeSwitch mode="ai" onSwitch={switchToManual} />
+        <button className="icon-btn" aria-label="Settings" onClick={() => router.push("/settings")}>
+          ⚙
+        </button>
       </div>
 
       <div className="tabs" style={{ marginBottom: 4 }}>

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { getUser, createServerSupabase } from "@/lib/supabase/server";
 import { hasSupabase } from "@/lib/env";
-import { MainApp } from "@/components/MainApp";
+import { ModeGate } from "@/components/ModeGate";
 
 export const dynamic = "force-dynamic";
 
@@ -33,5 +33,5 @@ export default async function Home() {
 
   if (!profile?.onboarded) redirect("/onboarding");
 
-  return <MainApp />;
+  return <ModeGate />;
 }

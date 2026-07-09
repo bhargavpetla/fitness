@@ -26,6 +26,19 @@
   --radius-sm: 12px;
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.04), 0 8px 24px rgba(16, 24, 40, 0.06);
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1); /* playful overshoot — mode switch */
+}
+
+/* AI Coach mode wears its own skin: electric violet accents on a faintly
+   cool canvas. Macro hues stay fixed (color is information); only the
+   chrome changes personality. Set via data-mode on <html> while the Coach
+   is mounted. */
+:root[data-mode="ai"] {
+  --canvas: #fdfcff;
+  --surface: #f6f4fc;
+  --line: #e9e5f5;
+  --accent: #6d4fd8;
+  --accent-soft: #eee9fb;
 }
 
 * {
@@ -70,23 +83,21 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   padding: 14px 20px 8px;
+}
+/* Home + Coach top bars float over scrolling content as liquid glass. */
+.topbar-sticky {
+  position: sticky;
+  top: 0;
+  z-index: 25;
+  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
+  border-radius: 0 0 20px 20px;
 }
 .daycount {
   font-weight: 600;
   font-size: 15px;
   letter-spacing: -0.01em;
-}
-.flame {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-weight: 700;
-  font-size: 15px;
-  color: var(--rest);
-}
-.flame.active {
-  color: var(--gold);
 }
 .icon-btn {
   border: none;
@@ -198,10 +209,11 @@ textarea {
 }
 
 /* ---- content list ---- */
+/* The body scrolls (not an inner container) so content genuinely slides
+   beneath the sticky glass chrome — that's what makes the glass read. */
 .content {
   flex: 1;
   padding: 14px 20px 120px;
-  overflow-y: auto;
 }
 .datebar {
   display: flex;
@@ -293,14 +305,14 @@ textarea {
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+  z-index: 25;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
   display: flex;
   justify-content: center;
   align-items: center;
   max-width: 520px;
   margin: 0 auto;
-  pointer-events: none;
-  background: linear-gradient(to top, var(--canvas) 60%, transparent);
+  border-radius: 20px 20px 0 0;
 }
 .btn-add {
   pointer-events: auto;
@@ -1581,6 +1593,129 @@ textarea {
 .plan-adjust .stepper-mid { padding: 8px 0; }
 .plan-adjust .stepper-mid input { width: 34px; font-size: 15px; }
 .plan-rest { text-align: center; display: flex; flex-direction: column; gap: 8px; align-items: center; padding: 26px 16px; }
+
+/* ===== Manual ⇄ AI Coach mode switch ===== */
+.mode-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 92px;
+  height: 44px; /* full touch target */
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  flex: 0 0 auto;
+  transition: background 0.3s var(--ease), border-color 0.3s var(--ease);
+}
+.mode-switch .mode-thumb {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 42px;
+  height: 34px;
+  border-radius: 999px;
+  background: var(--canvas);
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.16);
+  transition: transform 0.45s var(--spring);
+}
+.mode-switch.ai .mode-thumb {
+  transform: translateX(42px);
+  background: var(--accent);
+}
+.mode-switch .mode-opt {
+  position: relative;
+  z-index: 1;
+  width: 42px;
+  text-align: center;
+  font-size: 17px;
+  filter: grayscale(1);
+  opacity: 0.45;
+  transition: all 0.3s var(--ease);
+}
+.mode-switch .mode-opt.on {
+  filter: none;
+  opacity: 1;
+  transform: scale(1.08);
+}
+.mode-switch:active .mode-thumb {
+  transform: scale(0.92);
+}
+.mode-switch.ai:active .mode-thumb {
+  transform: translateX(42px) scale(0.92);
+}
+
+/* Full-screen color wash while the interface swaps beneath it. */
+.mode-wash {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  animation: wash 0.7s var(--ease) forwards;
+}
+.mode-wash.ai {
+  background: radial-gradient(circle at 50% 30%, #8b6ff0, #6d4fd8 60%, #5537c0);
+}
+.mode-wash.manual {
+  background: radial-gradient(circle at 50% 30%, #4d9e6f, #2f7a4d 60%, #22603a);
+}
+.mode-wash-icon {
+  font-size: 64px;
+  animation: washIcon 0.7s var(--spring);
+}
+@keyframes wash {
+  0% { clip-path: circle(0% at 50% 8%); }
+  40% { clip-path: circle(140% at 50% 8%); }
+  60% { clip-path: circle(140% at 50% 8%); opacity: 1; }
+  100% { clip-path: circle(140% at 50% 8%); opacity: 0; }
+}
+@keyframes washIcon {
+  0% { transform: scale(0.2) rotate(-20deg); opacity: 0; }
+  45% { transform: scale(1.15) rotate(6deg); opacity: 1; }
+  70% { transform: scale(1); }
+  100% { transform: scale(1); opacity: 0.9; }
+}
+
+/* Coach unlock teaser (before the 7-day streak is earned) */
+.unlock-dots {
+  display: flex;
+  gap: 8px;
+  margin: 6px 0;
+}
+.unlock-dot {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-2);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.unlock-dot.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* Two-way data sync indicator on plan days */
+.sync-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-soft);
+  color: var(--ink);
+  border-radius: 99px;
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  font-variant-numeric: tabular-nums;
+}
 
 @media (prefers-reduced-motion: reduce) {
   * {

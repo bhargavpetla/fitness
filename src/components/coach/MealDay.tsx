@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { updatePlanDay, addFoodLog } from "@/lib/db";
+import { updatePlanDay, addFoodLog, fetchDailyTotals } from "@/lib/db";
 import { fileToDataUrl, uploadPhoto, signedUrl } from "@/lib/photos";
 import type { AiPlanDay, MealDayPayload, PlanMeal } from "@/lib/types";
 
@@ -24,7 +24,20 @@ export function MealDay({
   const checked: boolean[] = payload.meals.map((_, i) => day.actual?.checked?.[i] ?? false);
   const [busy, setBusy] = useState<string | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [logged, setLogged] = useState<{ calories: number; protein_g: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Data is shared with manual mode — show what's actually been logged on
+  // this date (from either interface) next to the plan's targets.
+  useEffect(() => {
+    let on = true;
+    fetchDailyTotals(day.date, day.date)
+      .then((rows) => on && setLogged(rows[0] ?? null))
+      .catch(() => {});
+    return () => {
+      on = false;
+    };
+  }, [day.date, day.actual]);
 
   useEffect(() => {
     let on = true;
@@ -109,6 +122,12 @@ export function MealDay({
         <span>C {Math.round(payload.totals.carbs_g)}g</span>
         <span>F {Math.round(payload.totals.fat_g)}g</span>
       </div>
+
+      {logged && logged.calories > 0 && (
+        <div className="sync-chip">
+          ⇄ Logged this day: {Math.round(logged.calories)} kcal · P {Math.round(logged.protein_g)}g
+        </div>
+      )}
 
       {payload.meals.map((m, i) => (
         <MealCard

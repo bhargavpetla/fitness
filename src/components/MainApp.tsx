@@ -26,11 +26,18 @@ import { uploadPhoto } from "@/lib/photos";
 import { normalizeWorkout, totalVolume } from "@/lib/workout";
 import { todayStr, addDays, prettyDate, dayNumber, weekStart } from "@/lib/date";
 import { loadSession } from "@/lib/liveSession";
-import { liveStreak } from "@/lib/streak";
+import { useLiquidGlass } from "@/lib/liquidGlass";
+import { ModeSwitch } from "@/components/ModeSwitch";
 import { buildNudge } from "@/lib/nudges";
 import type { Profile, Goal, FoodLog, ExerciseLog, ExerciseConfig, Streak } from "@/lib/types";
 
-export function MainApp() {
+export function MainApp({
+  coachAvailable = false,
+  onSwitchMode,
+}: {
+  coachAvailable?: boolean;
+  onSwitchMode?: () => void;
+}) {
   const router = useRouter();
   const [tab, setTab] = useState<"food" | "exercise">("food");
   const [date, setDate] = useState(todayStr());
@@ -49,6 +56,10 @@ export function MainApp() {
   const [insightBusy, setInsightBusy] = useState(false);
   const [liveInProgress, setLiveInProgress] = useState(false);
   const [now, setNow] = useState(() => new Date());
+  const topbarRef = useRef<HTMLDivElement>(null);
+  const addbarRef = useRef<HTMLDivElement>(null);
+  useLiquidGlass(topbarRef, { scale: -60, blur: 4, fallbackBlur: 14 });
+  useLiquidGlass(addbarRef, { scale: -60, blur: 4, fallbackBlur: 14 });
 
   // "Resume workout" if a live session with logged exercises is sitting in
   // localStorage (e.g. the user backed out mid-gym-session).
@@ -130,7 +141,6 @@ export function MainApp() {
   );
 
   const day = profile ? dayNumber(profile.start_date, isToday ? todayStr() : date) : 1;
-  const streakN = liveStreak(streak);
 
   async function loadInsight() {
     setInsightBusy(true);
@@ -151,7 +161,7 @@ export function MainApp() {
     <div className="app-shell">
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
 
-      <div className="topbar">
+      <div className="topbar glass topbar-sticky" ref={topbarRef}>
         <div>
           {profile?.first_name && (
             <div style={{ fontSize: 12, color: "var(--ink-2)", fontWeight: 600 }}>
@@ -165,10 +175,7 @@ export function MainApp() {
             {now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
           </div>
         </div>
-        <span className={`flame ${streakN > 0 ? "active" : ""}`}>🔥 {streakN}</span>
-        <button className="icon-btn" aria-label="AI Coach" title="AI Coach" onClick={() => router.push("/coach")}>
-          ✨
-        </button>
+        {coachAvailable && onSwitchMode && <ModeSwitch mode="manual" onSwitch={() => onSwitchMode()} />}
         <button className="icon-btn" aria-label="Settings" onClick={() => router.push("/settings")}>
           ⚙
         </button>
@@ -226,7 +233,7 @@ export function MainApp() {
         )}
       </div>
 
-      <div className="add-bar">
+      <div className="add-bar glass" ref={addbarRef}>
         {tab === "food" ? (
           <>
             <button className="btn-add" onClick={() => setSheet(true)}>+ Add meal</button>
