@@ -322,3 +322,11 @@ Released under the **[MIT License](LICENSE)** — free to use, modify, and distr
 Built with 🍃 — plain English in, healthy habits out.
 
 </div>
+
+## Asset credits
+
+- Exercise animations & thumbnails © [Gym visual](https://gymvisual.com/) via [exercises-dataset](https://github.com/hasaneyldrm/exercises-dataset) (redistributed with permission, 180×180, attribution required).
+- Chrome icons: [Ionicons](https://github.com/ionic-team/ionicons) (MIT).
+- Guru icon: [Microsoft Fluent Emoji](https://github.com/microsoft/fluentui-emoji) (MIT).
+- Indian dish macros: [Indian Nutrient Databank](https://github.com/lindsayjaacks/Indian-Nutrient-Databank-INDB-); recipes/photos: Archana's Kitchen dataset.
+- Liquid glass effect ported from [deepika-builds/liquid-glass](https://github.com/deepika-builds/liquid-glass) (MIT).

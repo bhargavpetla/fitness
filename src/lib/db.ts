@@ -184,6 +184,28 @@ export async function fetchExerciseLogById(id: string): Promise<ExerciseLog | nu
   return (data as ExerciseLog) ?? null;
 }
 
+// All exercise logs since a date — powers the analytics trends.
+export async function fetchExerciseSince(fromDate: string): Promise<ExerciseLog[]> {
+  const sb = createClient();
+  const { data } = await sb
+    .from("exercise_logs")
+    .select("*")
+    .gte("date", fromDate)
+    .order("date", { ascending: true });
+  return (data as ExerciseLog[]) ?? [];
+}
+
+// Weigh-ins since a date, oldest first — the analytics weight trend.
+export async function fetchWeighInsSince(fromDate: string): Promise<Array<{ date: string; weight_kg: number }>> {
+  const sb = createClient();
+  const { data } = await sb
+    .from("weigh_ins")
+    .select("date, weight_kg")
+    .gte("date", fromDate)
+    .order("date", { ascending: true });
+  return (data ?? []).map((r) => ({ date: r.date as string, weight_kg: Number(r.weight_kg) }));
+}
+
 // All strength workouts, newest first — used for PRs and today-vs-last history.
 export async function fetchStrengthHistory(limit = 60): Promise<ExerciseLog[]> {
   const sb = createClient();

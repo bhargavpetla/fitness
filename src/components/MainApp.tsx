@@ -28,6 +28,7 @@ import { todayStr, addDays, prettyDate, dayNumber, weekStart } from "@/lib/date"
 import { loadSession } from "@/lib/liveSession";
 import { useLiquidGlass } from "@/lib/liquidGlass";
 import { ModeSwitch } from "@/components/ModeSwitch";
+import { Icon } from "@/components/Icon";
 import { buildNudge } from "@/lib/nudges";
 import type { Profile, Goal, FoodLog, ExerciseLog, ExerciseConfig, Streak } from "@/lib/types";
 
@@ -176,8 +177,11 @@ export function MainApp({
           </div>
         </div>
         {coachAvailable && onSwitchMode && <ModeSwitch mode="manual" onSwitch={() => onSwitchMode()} />}
+        <button className="icon-btn" aria-label="Analytics" title="Analytics" onClick={() => router.push("/analytics")}>
+          <Icon name="stats-chart-outline" />
+        </button>
         <button className="icon-btn" aria-label="Settings" onClick={() => router.push("/settings")}>
-          ⚙
+          <Icon name="settings-outline" />
         </button>
       </div>
 
@@ -202,10 +206,10 @@ export function MainApp({
 
       <div className="content">
         <div className="datebar">
-          <button onClick={() => setDate(addDays(date, -1))} aria-label="Previous day">‹</button>
+          <button onClick={() => setDate(addDays(date, -1))} aria-label="Previous day"><Icon name="chevron-back-outline" size={16} /></button>
           <span>{prettyDate(date)}</span>
-          <button onClick={() => setDate(addDays(date, 1))} disabled={isToday} aria-label="Next day">›</button>
-          <button onClick={() => setCalendarOpen(true)} aria-label="Calendar view" title="Calendar / summary">📅</button>
+          <button onClick={() => setDate(addDays(date, 1))} disabled={isToday} aria-label="Next day"><Icon name="chevron-forward-outline" size={16} /></button>
+          <button onClick={() => setCalendarOpen(true)} aria-label="Calendar view" title="Calendar / summary"><Icon name="calendar-outline" size={16} /></button>
         </div>
 
         {tab === "food" ? (
@@ -238,7 +242,7 @@ export function MainApp({
           <>
             <button className="btn-add" onClick={() => setSheet(true)}>+ Add meal</button>
             <button className="btn-guru" onClick={() => setGuruOpen(true)} aria-label="Ask the AI Guru" title="Ask the Guru">
-              ✨
+              <img src="/icons/guru3d.png" alt="" width={34} height={34} />
             </button>
           </>
         ) : (

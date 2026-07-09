@@ -5,11 +5,13 @@
    ============================================================================ */
 
 :root {
+  /* Apple system neutrals (per the apple-ui-design guidelines); the matcha
+     accent stays — it's the brand, macro colors are information. */
   --canvas: #ffffff;
-  --surface: #fafaf8;
-  --ink: #1a1a1a;
-  --ink-2: #6b7280;
-  --line: #ececec;
+  --surface: #f5f5f7;
+  --ink: #1d1d1f;
+  --ink-2: #86868b;
+  --line: #e8e8ed;
 
   --accent: #2f7a4d; /* matcha green — primary action, protein, master progress */
   --accent-soft: #e7f0ea;
@@ -58,6 +60,55 @@ body {
   overscroll-behavior-y: none;
 }
 
+/* Ambient color field behind everything — soft drifting gradient blobs.
+   This is what the liquid-glass chrome actually blurs and refracts; without
+   it, glass over a white canvas reads as plain white (the Apple demos all
+   sit glass on a colorful wallpaper for the same reason). */
+body::before {
+  content: "";
+  position: fixed;
+  inset: -25%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(42% 34% at 12% 8%, rgba(47, 122, 77, 0.2), transparent 65%),
+    radial-gradient(38% 30% at 88% 16%, rgba(224, 164, 88, 0.18), transparent 65%),
+    radial-gradient(46% 38% at 55% 92%, rgba(124, 106, 224, 0.16), transparent 65%),
+    radial-gradient(30% 24% at 70% 50%, rgba(47, 122, 77, 0.08), transparent 65%);
+  animation: ambient 26s ease-in-out infinite alternate;
+}
+:root[data-mode="ai"] body::before {
+  background:
+    radial-gradient(44% 36% at 14% 10%, rgba(109, 79, 216, 0.22), transparent 65%),
+    radial-gradient(38% 30% at 86% 18%, rgba(88, 156, 224, 0.16), transparent 65%),
+    radial-gradient(46% 38% at 55% 92%, rgba(224, 88, 181, 0.12), transparent 65%),
+    radial-gradient(30% 24% at 40% 55%, rgba(109, 79, 216, 0.08), transparent 65%);
+}
+@keyframes ambient {
+  from { transform: translate3d(-2.5%, -1.5%, 0) scale(1) rotate(-1deg); }
+  to { transform: translate3d(2.5%, 2%, 0) scale(1.08) rotate(1.5deg); }
+}
+
+/* masked, tintable chrome icons (Ionicons) */
+.icon {
+  display: inline-block;
+  background-color: currentColor;
+  flex: 0 0 auto;
+  vertical-align: -3px;
+}
+
+/* markdown blocks in AI answers */
+.md p { margin: 0 0 8px; }
+.md p:last-child { margin-bottom: 0; }
+.md ul, .md ol { margin: 0 0 8px; padding-left: 20px; }
+.md li { margin-bottom: 4px; }
+.md code {
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 5px;
+  padding: 1px 5px;
+  font-size: 0.92em;
+}
+
 button {
   font-family: inherit;
   cursor: pointer;
@@ -72,10 +123,10 @@ textarea {
 .app-shell {
   max-width: 520px;
   margin: 0 auto;
-  min-height: 100dvh;
+  height: 100dvh; /* fixed: the inner .content scrolls, so pinned chrome never wobbles with iOS rubber-banding */
   display: flex;
   flex-direction: column;
-  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+  padding: env(safe-area-inset-top) 0 0;
 }
 
 /* ---- top bar ---- */
@@ -86,13 +137,13 @@ textarea {
   gap: 10px;
   padding: 14px 20px 8px;
 }
-/* Home + Coach top bars float over scrolling content as liquid glass. */
+/* Home + Coach top bars: liquid glass over the ambient color field. */
 .topbar-sticky {
-  position: sticky;
-  top: 0;
+  position: relative;
   z-index: 25;
-  padding: calc(10px + env(safe-area-inset-top)) 16px 10px;
-  border-radius: 0 0 20px 20px;
+  padding: 10px 16px;
+  margin: 0 8px;
+  border-radius: 20px;
 }
 .daycount {
   font-weight: 600;
@@ -209,11 +260,15 @@ textarea {
 }
 
 /* ---- content list ---- */
-/* The body scrolls (not an inner container) so content genuinely slides
-   beneath the sticky glass chrome — that's what makes the glass read. */
+/* Inner scroll container: fixed chrome stays rock-solid on iOS, content
+   slides beneath the glass bottom bar, and the ambient background gives the
+   glass top bar something to blur. */
 .content {
   flex: 1;
-  padding: 14px 20px 120px;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px 20px 130px;
 }
 .datebar {
   display: flex;
@@ -339,11 +394,15 @@ textarea {
   height: 56px;
   border-radius: 50%;
   border: none;
-  background: var(--fat);
-  color: #fff;
-  font-size: 22px;
-  box-shadow: 0 6px 20px rgba(124, 106, 224, 0.4);
+  display: grid;
+  place-items: center;
+  background: radial-gradient(120% 120% at 30% 20%, #a08ef0, var(--fat) 70%);
+  box-shadow: 0 6px 20px rgba(124, 106, 224, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.5);
   transition: transform 0.15s var(--ease);
+}
+.btn-guru img {
+  display: block;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.25));
 }
 .btn-guru:active {
   transform: scale(0.94);
@@ -735,16 +794,16 @@ textarea {
    Chromium gets real edge refraction; Safari/Firefox get the frosted fallback.
    ============================================================================ */
 .glass {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.34));
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.2));
   box-shadow:
-    0 8px 24px rgba(16, 24, 40, 0.08),
-    inset 0 1px 1px rgba(255, 255, 255, 0.75),
-    inset 0 -6px 16px rgba(255, 255, 255, 0.12),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+    0 10px 30px rgba(16, 24, 40, 0.1),
+    inset 0 1px 1px rgba(255, 255, 255, 0.9),
+    inset 0 -10px 24px rgba(255, 255, 255, 0.18),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.45);
 }
 .glass.lg-fallback {
-  /* frosted fallback needs a touch more body to read as a surface */
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.6));
+  /* iOS/Firefox frosted fallback: let the ambient color show through */
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.32));
 }
 
 /* ===== Live workout logger ===== */
@@ -1743,6 +1802,119 @@ textarea {
   margin-bottom: 12px;
   font-variant-numeric: tabular-nums;
 }
+
+/* ===== Analytics (/analytics) — WHOOP-style, graphs first ===== */
+.content.an { padding-bottom: 40px; }
+
+.an-hero {
+  display: flex;
+  justify-content: center;
+  gap: 26px;
+  background: radial-gradient(140% 160% at 20% 0%, #2c2c34, #17171c 70%);
+  border-radius: var(--radius);
+  padding: 22px 12px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow), inset 0 1px 1px rgba(255, 255, 255, 0.08);
+}
+.an-ring { position: relative; display: grid; place-items: center; }
+.an-ring svg { display: block; }
+.an-ring-mid {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.an-ring-num {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.an-ring-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.an-focus {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.an-focus-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent-soft);
+  color: var(--ink);
+  border: 1px solid var(--accent);
+  border-radius: 99px;
+  padding: 7px 13px;
+  font-size: 12.5px;
+  font-weight: 700;
+  animation: rise 0.35s var(--ease);
+}
+
+.an-card {
+  background: var(--canvas);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow);
+  animation: rise 0.35s var(--ease);
+}
+.an-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.an-card-head .icon { color: var(--ink-2); }
+.an-kpi {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--ink-2);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.an-chart { margin: 0 -6px; }
+.an-grow { transition: width 0.9s var(--ease); }
+
+.an-grid {
+  display: grid;
+  grid-template-columns: repeat(14, 1fr);
+  gap: 6px;
+  margin: 6px 0 10px;
+}
+.an-dot {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  display: inline-block;
+}
+.an-dot.food { background: #cde7d8; border-color: #cde7d8; }
+.an-dot.train { background: #ddd6f8; border-color: #ddd6f8; }
+.an-dot.both { background: var(--accent); border-color: var(--accent); }
+.an-dot.rest { background: #f2e8cf; border-color: #f2e8cf; }
+.an-legend {
+  display: flex;
+  gap: 14px;
+  font-size: 11px;
+  color: var(--ink-2);
+  align-items: center;
+}
+.an-legend i.an-dot { width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
 
 @media (prefers-reduced-motion: reduce) {
   * {

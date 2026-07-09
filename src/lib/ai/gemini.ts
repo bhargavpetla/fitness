@@ -393,6 +393,7 @@ Rules:
 - If context says a planned workout was missed or swapped for an unexpected rest day, don't drop that muscle group — reshuffle the remaining days so the split still covers everything without doubling fatigue.
 - If feedback from last week is given, adapt visibly: "more" intensity → slightly heavier or +1 set on key lifts; "less" → trim a set or lighten loads; honor any note.
 - Use a coherent split inferred from their history (e.g. Push/Pull/Legs, Upper/Lower).
+- CONTINUITY: day 1 of this plan is the NEXT step of their most recent rotation — if their last days were Push → Legs → Rest, day 1 is Pull. Never restart the split from scratch, and never train a muscle group they hit within the last 48 hours.
 - Progression on repeated exercises: small weight or rep bumps over what they last did.
 - 4-7 exercises per workout. Prefer the exact exercise names they already do; add close variations for balance (use common gym names — they are matched to an animation library).
 - weight_kg: their realistic working weight, or null for bodyweight moves.

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Markdown } from "@/components/Markdown";
 
 interface Msg {
   role: "user" | "model";
@@ -51,7 +52,9 @@ export function GuruChat({ name, onClose }: { name: string | null; onClose: () =
     <>
       <div className="sheet-backdrop" onClick={onClose} />
       <div className="sheet" role="dialog" aria-modal="true" style={{ display: "flex", flexDirection: "column", height: "82dvh" }}>
-        <h3>✨ AI Guru</h3>
+        <h3 style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <img src="/icons/guru3d.png" alt="" width={28} height={28} /> AI Guru
+        </h3>
 
         <div style={{ flex: 1, overflowY: "auto", margin: "4px 0 12px" }}>
           {msgs.length === 0 && (
@@ -84,12 +87,11 @@ export function GuruChat({ name, onClose }: { name: string | null; onClose: () =
                   borderRadius: 16,
                   fontSize: 14,
                   lineHeight: 1.45,
-                  whiteSpace: "pre-wrap",
                   background: m.role === "user" ? "var(--accent)" : "var(--surface)",
                   color: m.role === "user" ? "#fff" : "var(--ink)",
                 }}
               >
-                {m.text}
+                {m.role === "model" ? <Markdown text={m.text} /> : m.text}
               </div>
             </div>
           ))}

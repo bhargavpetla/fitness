@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Toast } from "@/components/Toast";
 import { LoadingJoke } from "@/components/LoadingJoke";
 import { ModeSwitch } from "@/components/ModeSwitch";
+import { Icon } from "@/components/Icon";
 import { PlanHeader } from "./PlanHeader";
 import { MealDay } from "./MealDay";
 import { WorkoutDay } from "./WorkoutDay";
@@ -198,8 +199,11 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
       <div className="topbar glass topbar-sticky" ref={topbarRef}>
         <span className="daycount">AI Coach ✨</span>
         <ModeSwitch mode="ai" onSwitch={switchToManual} />
+        <button className="icon-btn" aria-label="Analytics" title="Analytics" onClick={() => router.push("/analytics")}>
+          <Icon name="stats-chart-outline" />
+        </button>
         <button className="icon-btn" aria-label="Settings" onClick={() => router.push("/settings")}>
-          ⚙
+          <Icon name="settings-outline" />
         </button>
       </div>
 

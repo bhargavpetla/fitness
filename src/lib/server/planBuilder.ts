@@ -81,7 +81,17 @@ export async function buildWorkoutContext(sb: SupabaseClient, sinceStr: string):
     })
     .join("\n");
   const configText = `Weekly session target: ${cfg?.weekly_target_sessions ?? 4}. ${cfg?.split_pattern ? `Preferred split: ${cfg.split_pattern}.` : ""} ${logs.length === 0 ? "No workout history — start conservative, beginner-friendly weights (or bodyweight), full-body 3×/week." : ""}`;
-  return { digest: digest || "(no workouts logged yet)", configText };
+
+  // Spell out the rotation tail so day 1 of the plan continues it — after
+  // Push → Legs → Rest, the next session is Pull, not a restart.
+  const recent = logs
+    .slice(-4)
+    .map((l) => (l.type === "strength" ? (l.parsed_json?.workout_name ?? "Strength") : l.type))
+    .join(" → ");
+  const digestWithTail = digest
+    ? `${digest}\n\nMOST RECENT DAYS, IN ORDER (continue this rotation): ${recent}`
+    : "(no workouts logged yet)";
+  return { digest: digestWithTail, configText };
 }
 
 export async function buildProfileNote(sb: SupabaseClient): Promise<string> {
