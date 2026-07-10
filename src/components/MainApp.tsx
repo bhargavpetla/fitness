@@ -28,6 +28,7 @@ import { loadSession } from "@/lib/liveSession";
 import { useLiquidGlass } from "@/lib/liquidGlass";
 import { ModeSwitch } from "@/components/ModeSwitch";
 import { Icon } from "@/components/Icon";
+import { Mascot } from "@/components/Mascot";
 import { fx } from "@/lib/fx";
 import { buildNudge } from "@/lib/nudges";
 import type { Profile, Goal, FoodLog, ExerciseLog, ExerciseConfig, Streak } from "@/lib/types";
@@ -316,8 +317,7 @@ function FoodList({ foods, onDelete }: { foods: FoodLog[]; onDelete: (id: string
   if (foods.length === 0) {
     return (
       <div className="center-screen" style={{ padding: "30px 20px" }}>
-        <span style={{ color: "var(--ink-2)" }}><Icon name="restaurant-outline" size={36} /></span>
-        <p className="muted">No meals logged yet. Tap + to add one.</p>
+        <Mascot pose="hello" bubble="I'm hungry — log your first meal! 🍽" />
       </div>
     );
   }
@@ -362,8 +362,7 @@ function ExerciseList({
       )}
       {exercises.length === 0 ? (
         <div className="center-screen" style={{ padding: "30px 20px" }}>
-          <span style={{ color: "var(--ink-2)" }}><Icon name="barbell-outline" size={36} /></span>
-          <p className="muted">No workout logged. Even a rest day counts.</p>
+          <Mascot pose="flex" bubble="Ready when you are — even a rest day counts 💪" />
           {cfg?.split_pattern && <p className="muted" style={{ fontSize: 13 }}>Pattern: {cfg.split_pattern}</p>}
         </div>
       ) : (

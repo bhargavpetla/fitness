@@ -11,6 +11,13 @@ export const maxDuration = 60;
 const STYLE =
   "flat minimalist vector illustration, pure white background, single matcha-green (#2F7A4D) accent, soft, calm, no text, centered, lots of negative space";
 
+// The app's pet: "Macha" — one consistent character across every pose, so it
+// reads as a companion (Duolingo-style), not random clip-art.
+const PET =
+  "Macha, an adorable round chubby matcha-green blob pet with big friendly eyes, tiny stub arms, " +
+  "rosy cheeks and a small leaf sprout on its head. Cute flat vector illustration with soft shading, " +
+  "pure white background, no text, centered, kawaii, consistent character design";
+
 const SET: Record<string, string> = {
   onboarding: `${STYLE}. A minimalist figure mid-lift, confident and clean.`,
   empty: `${STYLE}. A simple empty plate with a sprig of greenery, inviting.`,
@@ -20,6 +27,11 @@ const SET: Record<string, string> = {
   "badge-30": `${STYLE}. A small circular achievement badge for a month, a single bold ring.`,
   "badge-60": `${STYLE}. A small circular achievement badge for sixty days, layered rings.`,
   "badge-100": `${STYLE}. A celebratory circular badge for one hundred days, a gentle starburst.`,
+  "mascot-hello": `${PET}. Waving hello with one stub arm, welcoming smile.`,
+  "mascot-cheer": `${PET}. Jumping in celebration with tiny confetti pieces around it, overjoyed.`,
+  "mascot-flex": `${PET}. Proudly flexing while holding a tiny purple dumbbell, determined grin.`,
+  "mascot-zen": `${PET}. Meditating cross-legged with closed eyes, a soft violet glow ring behind it.`,
+  "mascot-sleep": `${PET}. Fast asleep curled on a tiny pillow, a little Z above its head.`,
 };
 
 export async function POST(req: Request) {

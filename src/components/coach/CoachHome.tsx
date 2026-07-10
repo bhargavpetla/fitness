@@ -6,6 +6,7 @@ import { Toast } from "@/components/Toast";
 import { LoadingJoke } from "@/components/LoadingJoke";
 import { ModeSwitch } from "@/components/ModeSwitch";
 import { Icon } from "@/components/Icon";
+import { Mascot } from "@/components/Mascot";
 import { fx } from "@/lib/fx";
 import { PlanHeader } from "./PlanHeader";
 import { MealDay } from "./MealDay";
@@ -174,7 +175,7 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
             <span className="spinner" style={{ borderTopColor: "var(--accent)" }} />
           ) : (
             <>
-              <div className="coach-hero-icon"><Icon name="lock-closed-outline" size={36} /></div>
+              <Mascot pose="sleep" size={110} />
               <h2>The Coach is earned</h2>
               <p className="muted">
                 Log for {UNLOCK_DAYS} days in a row and the AI Coach unlocks — it needs to watch how you
@@ -235,9 +236,7 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
           <div className="center-screen"><span className="spinner" style={{ borderTopColor: "var(--accent)" }} /></div>
         ) : !plan ? (
           <div className="coach-hero">
-            <div className="coach-hero-icon">
-              <Icon name={kind === "meal" ? "restaurant-outline" : "barbell-outline"} size={36} />
-            </div>
+            <Mascot pose="zen" size={110} />
             <h2>{kind === "meal" ? "A week of meals, made for you" : "A week of training, built on your lifts"}</h2>
             <p className="muted">
               {kind === "meal"
@@ -374,6 +373,9 @@ function FeedbackCard({
 
   return (
     <div className="card feedback-card pop-in">
+      <div style={{ display: "flex", justifyContent: "center", marginBottom: 4 }}>
+        <Mascot pose="cheer" size={84} />
+      </div>
       <div className="meal">Week done — {completed}/{total} days {completed === total ? "🏆" : "🎉"}</div>
       <p className="sub" style={{ marginBottom: 10 }}>Tell the coach how it went; next week adapts to this.</p>
 

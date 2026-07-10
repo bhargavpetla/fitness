@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { updatePlanDay, addExerciseLog } from "@/lib/db";
 import { thumbUrlFromKey, MEDIA_ATTRIBUTION } from "@/lib/exerciseLibrary";
 import { DetailSheet } from "@/components/DetailSheet";
+import { Mascot } from "@/components/Mascot";
 import { fx } from "@/lib/fx";
 import type { AiPlanDay, WorkoutDayPayload, PlanExercise, ParsedExercise } from "@/lib/types";
 
@@ -141,7 +142,7 @@ export function WorkoutDay({
   if (payload.kind === "rest") {
     return (
       <div className={`card rest plan-rest ${locked ? "day-locked-wrap" : ""}`} style={{ animation: "none" }}>
-        <div style={{ fontSize: 34 }}>😌</div>
+        <Mascot pose="sleep" size={92} />
         <div className="meal">Rest & recover</div>
         <p className="sub">{payload.note || "Muscle grows on the days you don't lift. Eat well, sleep well."}</p>
         {!locked &&
