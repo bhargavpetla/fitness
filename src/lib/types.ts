@@ -257,7 +257,12 @@ export interface MealDayPayload {
 export interface PlanExercise {
   name: string;
   sets: number;
-  reps: number;
+  reps: number; // default logged rep target (kept for back-compat + logging)
+  // Progressive-overload rep range for the lift. Heavy compounds sit low
+  // (e.g. 6–8), accessories mid (8–12), isolation high (12–15). Optional so
+  // older stored plans still render off `reps`.
+  rep_low?: number | null;
+  rep_high?: number | null;
   weight_kg: number | null; // null = bodyweight / user's choice
   note?: string | null; // e.g. "up 2.5kg from last week"
   media?: string | null; // exercise-library media key (GIF/thumb)

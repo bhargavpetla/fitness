@@ -163,26 +163,26 @@ export function MainApp({
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
 
       <div className="topbar glass topbar-sticky" ref={topbarRef}>
-        <div>
+        <div className="topbar-lead">
           {profile?.first_name && (
-            <div style={{ fontSize: 12, color: "var(--ink-2)", fontWeight: 600 }}>
-              {greeting()}, {profile.first_name}
-            </div>
+            <div className="topbar-greet">{greeting()}, {profile.first_name}</div>
           )}
           <span className="daycount">Day {day}</span>
-          <div style={{ fontSize: 11, color: "var(--ink-2)", fontWeight: 500, fontVariantNumeric: "tabular-nums" }}>
-            {now.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric" })}
+          <div className="topbar-date">
+            {now.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}
             {" · "}
             {now.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
           </div>
         </div>
-        {coachAvailable && onSwitchMode && <ModeSwitch mode="manual" onSwitch={() => onSwitchMode()} />}
-        <button className="icon-btn" aria-label="Analytics" title="Analytics" onClick={() => router.push("/analytics")}>
-          <Icon name="stats-chart-outline" />
-        </button>
-        <button className="icon-btn" aria-label="Settings" onClick={() => router.push("/settings")}>
-          <Icon name="settings-outline" />
-        </button>
+        <div className="topbar-actions">
+          {coachAvailable && onSwitchMode && <ModeSwitch mode="manual" onSwitch={() => onSwitchMode()} />}
+          <button className="icon-btn" aria-label="Analytics" title="Analytics" onClick={() => router.push("/analytics")}>
+            <Icon name="stats-chart-outline" />
+          </button>
+          <button className="icon-btn" aria-label="Settings" onClick={() => router.push("/settings")}>
+            <Icon name="settings-outline" />
+          </button>
+        </div>
       </div>
 
       <TopCounter

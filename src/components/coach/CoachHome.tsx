@@ -67,14 +67,14 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
     setLoading(true);
     try {
       const p = await fetchActivePlan(kind);
+      const d = p ? await fetchPlanDays(p.id) : [];
+      // Set plan + days together in one commit. Previously setPlan ran before
+      // the await for the days, so a render could see the new kind's plan with
+      // the previous kind's days (or vice-versa) — a meal payload handed to
+      // WorkoutDay, which crashed with a client-side exception.
       setPlan(p);
-      if (p) {
-        const d = await fetchPlanDays(p.id);
-        setDays(d);
-        setSel(todayIndex(d));
-      } else {
-        setDays([]);
-      }
+      setDays(d);
+      setSel(p ? todayIndex(d) : 0);
     } finally {
       setLoading(false);
     }
@@ -201,16 +201,20 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
 
       <div className="topbar glass topbar-sticky" ref={topbarRef}>
-        <span className="daycount" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <Icon name="flash-outline" size={16} /> Coach
-        </span>
-        <ModeSwitch mode="ai" onSwitch={switchToManual} />
-        <button className="icon-btn" aria-label="Analytics" title="Analytics" onClick={() => router.push("/analytics")}>
-          <Icon name="stats-chart-outline" />
-        </button>
-        <button className="icon-btn" aria-label="Settings" onClick={() => router.push("/settings")}>
-          <Icon name="settings-outline" />
-        </button>
+        <div className="topbar-lead">
+          <span className="daycount" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <Icon name="flash-outline" size={16} /> Coach
+          </span>
+        </div>
+        <div className="topbar-actions">
+          <ModeSwitch mode="ai" onSwitch={switchToManual} />
+          <button className="icon-btn" aria-label="Analytics" title="Analytics" onClick={() => router.push("/analytics")}>
+            <Icon name="stats-chart-outline" />
+          </button>
+          <button className="icon-btn" aria-label="Settings" onClick={() => router.push("/settings")}>
+            <Icon name="settings-outline" />
+          </button>
+        </div>
       </div>
 
       <div className="tabs" style={{ marginBottom: 4 }}>
@@ -225,7 +229,9 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
       <div className="content coach-body">
         {generating ? (
           <LoadingJoke label={generating} />
-        ) : loading ? (
+        ) : loading || (plan && plan.kind !== kind) ? (
+          // While a tab switch is loading, the still-mounted plan belongs to the
+          // other kind — hold on the spinner rather than render a mismatched day.
           <div className="center-screen"><span className="spinner" style={{ borderTopColor: "var(--accent)" }} /></div>
         ) : !plan ? (
           <div className="coach-hero">
@@ -300,7 +306,7 @@ export function CoachHome({ onSwitchMode }: { onSwitchMode?: () => void }) {
               ))}
             </div>
 
-            {day && !isPlanOver(plan) && (
+            {day && day.plan_id === plan.id && !isPlanOver(plan) && (
               <>
                 <div className="day-title">
                   <span>Day {day.day_index} · {prettyDate(day.date)}</span>

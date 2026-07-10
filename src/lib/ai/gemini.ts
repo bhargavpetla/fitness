@@ -363,6 +363,8 @@ export interface RawWorkoutPlan {
       name: string;
       sets: number;
       reps: number;
+      rep_low?: number;
+      rep_high?: number;
       weight_kg: number | null;
       note?: string;
     }>;
@@ -396,13 +398,18 @@ Rules:
 - CONTINUITY: day 1 of this plan is the NEXT step of their most recent rotation — if their last days were Push → Legs → Rest, day 1 is Pull. Never restart the split from scratch, and never train a muscle group they hit within the last 48 hours.
 - Progression on repeated exercises: small weight or rep bumps over what they last did.
 - 4-7 exercises per workout. Prefer the exact exercise names they already do; add close variations for balance (use common gym names — they are matched to an animation library).
+- REP RANGES, not one fixed number, matched to the lift's role (this is how real hypertrophy/strength programs autoregulate):
+  • Heavy compound lifts (squat, deadlift, bench, barbell row, overhead press): rep_low 5, rep_high 8.
+  • Secondary compounds (incline press, RDL, pull-ups, dips, leg press): rep_low 8, rep_high 10.
+  • Isolation / accessory (curls, lateral raises, pushdowns, leg curls, calf raises): rep_low 10, rep_high 15.
+  Return rep_low and rep_high for EVERY exercise with rep_low < rep_high, and set reps = rep_high (the top of the range they push toward before adding weight). Do NOT give every exercise the same reps.
 - weight_kg: their realistic working weight, or null for bodyweight moves.
 - "note": short cue when something changed ("up 2.5kg from last week", "same weight, +1 rep").
 - "name": punchy day name ("Push Day", "Pull Day", "Leg Day", "Rest").
 
 Return JSON shaped exactly:
 { "context_summary": "<3-4 sentences on their training pattern and the plan's logic>",
-  "days": [ { "day": ${input.dayFrom}, "kind": "workout", "name": "Push Day", "focus": ["Chest","Triceps"], "note": "...", "exercises": [ { "name": string, "sets": number, "reps": number, "weight_kg": number|null, "note": string } ] } ] }`;
+  "days": [ { "day": ${input.dayFrom}, "kind": "workout", "name": "Push Day", "focus": ["Chest","Triceps"], "note": "...", "exercises": [ { "name": string, "sets": number, "reps": number, "rep_low": number, "rep_high": number, "weight_kg": number|null, "note": string } ] } ] }`;
 
   const user = `MY LAST 30 DAYS OF TRAINING:\n${input.historyDigest}\n\nMY SETUP:\n${input.configText}\n\nABOUT ME: ${input.profileNote}${input.prefsNote ? `\n\nMY PREFERENCES: ${input.prefsNote}` : ""}${input.feedbackNote ? `\n\nMY FEEDBACK ON LAST WEEK: ${input.feedbackNote}` : ""}${input.continuityNote ? `\n\nCONTEXT — ALREADY PLANNED / WHAT ACTUALLY HAPPENED THIS WEEK (reshuffle the remaining days around this):\n${input.continuityNote}` : ""}`;
 

@@ -17,19 +17,54 @@ import {
 } from "recharts";
 import { Icon } from "@/components/Icon";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
-import { fetchDailyTotals, fetchActiveGoal, fetchExerciseSince, fetchWeighInsSince } from "@/lib/db";
-import { normalizeWorkout, muscleGroupOf, totalVolume } from "@/lib/workout";
+import { fetchDailyTotals, fetchActiveGoal, fetchExerciseSince, fetchWeighInsSince, fetchProfile, fetchStreak } from "@/lib/db";
+import { normalizeWorkout, muscleGroupOf, totalVolume, totalSets, totalReps } from "@/lib/workout";
 import { todayStr, addDays } from "@/lib/date";
-import type { Goal, ExerciseLog } from "@/lib/types";
+import type { Goal, ExerciseLog, Profile, Streak } from "@/lib/types";
 
 // WHOOP-style analytics: two big scores, then trends — graphs first, words
 // last. Everything on this page is computed locally from the logs, so it's
-// free, instant, and always honest.
+// free, instant, and always honest. Plus personalised body metrics (BMI, BMR,
+// maintenance calories) and a few fun cumulative stats.
 
 const ACCENT = "#2f7a4d";
 const CARBS = "#e0a458";
 const FAT = "#7c6ae0";
 const INK2 = "#86868b";
+
+// Mifflin–St Jeor activity multipliers, keyed to the profile's activity level.
+const ACTIVITY: Record<string, number> = {
+  sedentary: 1.2,
+  light: 1.375,
+  moderate: 1.55,
+  very: 1.725,
+};
+
+// Non-judgemental BMI banding (WHO cut-offs) with a marker position on a
+// 15–35 scale for the little gauge.
+function bmiInfo(bmi: number): { label: string; color: string; pos: number } {
+  const pos = Math.max(2, Math.min(98, ((bmi - 15) / 20) * 100));
+  if (bmi < 18.5) return { label: "Underweight", color: "#5aa9e6", pos };
+  if (bmi < 25) return { label: "Healthy range", color: "#16a34a", pos };
+  if (bmi < 30) return { label: "Above range", color: "#e8963e", pos };
+  return { label: "Well above range", color: "#e0654a", pos };
+}
+
+// A playful, relatable equivalent for a big pile of kilograms moved.
+function funMass(kg: number): string {
+  const refs = [
+    { kg: 6000, one: "elephant", emoji: "🐘" },
+    { kg: 1500, one: "car", emoji: "🚗" },
+    { kg: 450, one: "piano", emoji: "🎹" },
+    { kg: 100, one: "panda", emoji: "🐼" },
+    { kg: 12, one: "bowling ball", emoji: "🎳" },
+  ];
+  for (const r of refs) {
+    const n = kg / r.kg;
+    if (n >= 1) return `${n >= 10 ? Math.round(n) : n.toFixed(1)} ${r.one}${n >= 2 ? "s" : ""} ${r.emoji}`;
+  }
+  return "a solid warm-up 💪";
+}
 
 interface DayRow {
   date: string;
@@ -43,6 +78,8 @@ export function AnalyticsHome() {
   const [goal, setGoal] = useState<Goal | null>(null);
   const [exLogs, setExLogs] = useState<ExerciseLog[]>([]);
   const [weights, setWeights] = useState<Array<{ date: string; weight_kg: number }>>([]);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [streak, setStreak] = useState<Streak | null>(null);
   const [loading, setLoading] = useState(true);
 
   const today = todayStr();
@@ -55,12 +92,16 @@ export function AnalyticsHome() {
       fetchActiveGoal(),
       fetchExerciseSince(from42),
       fetchWeighInsSince(addDays(today, -59)),
+      fetchProfile(),
+      fetchStreak(),
     ])
-      .then(([r, g, e, w]) => {
+      .then(([r, g, e, w, p, s]) => {
         setRows(r);
         setGoal(g);
         setExLogs(e);
         setWeights(w);
+        setProfile(p);
+        setStreak(s);
       })
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -174,6 +215,47 @@ export function AnalyticsHome() {
     [weights]
   );
 
+  // ---- personalised body metrics ----
+  const latestWeight = weights.length ? weights[weights.length - 1].weight_kg : null;
+
+  const bmi = useMemo(() => {
+    if (!latestWeight || !profile?.height_cm) return null;
+    const h = profile.height_cm / 100;
+    return latestWeight / (h * h);
+  }, [latestWeight, profile]);
+
+  const energy = useMemo(() => {
+    if (!latestWeight || !profile?.height_cm || !profile?.age) return null;
+    const base = 10 * latestWeight + 6.25 * profile.height_cm - 5 * profile.age;
+    // Mifflin–St Jeor; the "unspecified" sex splits the +5 / −161 offset.
+    const bmr = profile.sex === "male" ? base + 5 : profile.sex === "female" ? base - 161 : base - 78;
+    const factor = ACTIVITY[profile.activity_level ?? "moderate"] ?? 1.55;
+    return { bmr: Math.round(bmr), tdee: Math.round(bmr * factor) };
+  }, [latestWeight, profile]);
+
+  // ---- fun cumulative stats (last 30 days of training + all-time streak) ----
+  const funStats = useMemo(() => {
+    const cutoff = addDays(today, -29);
+    const recent = strength.filter((l) => l.date >= cutoff);
+    let vol = 0, sets = 0, reps = 0;
+    for (const l of recent) {
+      const ex = normalizeWorkout(l.parsed_json);
+      vol += totalVolume(ex);
+      sets += totalSets(ex);
+      reps += totalReps(ex);
+    }
+    const burned = exLogs
+      .filter((l) => l.date >= cutoff && l.est_calories != null)
+      .reduce((a, l) => a + Number(l.est_calories), 0);
+    const workouts = new Set(recent.map((l) => l.date)).size;
+    return { vol, sets, reps, burned: Math.round(burned), workouts };
+  }, [strength, exLogs, today]);
+
+  const loggedThisMonth = grid.filter((g) => g.food || g.train).length;
+  const introLine = streak && streak.current_streak > 0
+    ? `${streak.current_streak}-day streak 🔥 · ${loggedThisMonth}/28 days logged this month`
+    : `${loggedThisMonth}/28 days logged this month — keep it rolling`;
+
   return (
     <div className="app-shell">
       <div className="topbar">
@@ -189,6 +271,12 @@ export function AnalyticsHome() {
           <div className="center-screen"><span className="spinner" style={{ borderTopColor: "var(--accent)" }} /></div>
         ) : (
           <>
+            {/* personalised intro */}
+            <div className="an-intro">
+              <h1 className="an-intro-title">{profile?.first_name ? `${profile.first_name}'s month` : "Your month"}</h1>
+              <p className="an-intro-sub">{introLine}</p>
+            </div>
+
             {/* scores hero */}
             <div className="an-hero">
               <ScoreRing label="Nutrition" score={nutritionScore} color="#7ee2a8" />
@@ -202,6 +290,45 @@ export function AnalyticsHome() {
                   <span key={i} className="an-focus-chip"><Icon name={f.icon} size={14} /> {f.text}</span>
                 ))}
               </div>
+            )}
+
+            {/* body metrics — personalised (BMI, resting + maintenance calories) */}
+            {profile && (
+              <section className="an-card">
+                <div className="an-card-head">
+                  <Icon name="sparkles-outline" size={16} />
+                  <span>Body</span>
+                  {latestWeight && <span className="an-kpi">{latestWeight} kg</span>}
+                </div>
+                {bmi ? (
+                  <div className="an-bmi">
+                    <div className="an-bmi-top">
+                      <span className="an-bmi-num" style={{ color: bmiInfo(bmi).color }}>{bmi.toFixed(1)}</span>
+                      <span className="an-bmi-cap">BMI · <b style={{ color: bmiInfo(bmi).color }}>{bmiInfo(bmi).label}</b></span>
+                    </div>
+                    <div className="an-bmi-scale">
+                      <span className="an-bmi-marker" style={{ left: `${bmiInfo(bmi).pos}%` }} />
+                    </div>
+                    <div className="an-bmi-ticks"><span>15</span><span>18.5</span><span>25</span><span>30</span><span>35</span></div>
+                  </div>
+                ) : (
+                  <p className="muted" style={{ fontSize: 13, margin: "0 0 2px" }}>
+                    Log a weigh-in{profile.height_cm ? "" : " and add your height in settings"} to unlock your BMI.
+                  </p>
+                )}
+                {energy && (
+                  <div className="an-energy">
+                    <div className="an-energy-cell">
+                      <span className="an-energy-val">{energy.bmr.toLocaleString()}</span>
+                      <span className="an-energy-label">BMR · resting burn</span>
+                    </div>
+                    <div className="an-energy-cell">
+                      <span className="an-energy-val">{energy.tdee.toLocaleString()}</span>
+                      <span className="an-energy-label">Maintenance · with activity</span>
+                    </div>
+                  </div>
+                )}
+              </section>
             )}
 
             {/* calories trend */}
@@ -311,6 +438,30 @@ export function AnalyticsHome() {
               </section>
             )}
 
+            {/* fun cumulative stats */}
+            {(funStats.workouts > 0 || (streak && streak.total_days_logged > 0)) && (
+              <section className="an-card">
+                <div className="an-card-head">
+                  <Icon name="trophy-outline" size={16} />
+                  <span>Fun stats · 30d</span>
+                </div>
+                {funStats.vol > 0 && (
+                  <div className="an-funhero">
+                    <span className="an-funhero-big">{funMass(funStats.vol)}</span>
+                    <span className="an-funhero-sub">total lifted · {funStats.vol.toLocaleString()} kg moved in 30 days</span>
+                  </div>
+                )}
+                <div className="an-funstats">
+                  <FunTile value={String(funStats.workouts)} label="workouts" />
+                  <FunTile value={funStats.sets.toLocaleString()} label="sets" />
+                  <FunTile value={funStats.reps.toLocaleString()} label="reps" />
+                  <FunTile value={funStats.burned.toLocaleString()} label="kcal burned" />
+                  {streak && <FunTile value={`${streak.longest_streak} 🔥`} label="best streak" />}
+                  {streak && <FunTile value={String(streak.total_days_logged)} label="days logged" />}
+                </div>
+              </section>
+            )}
+
             {/* consistency grid */}
             <section className="an-card">
               <div className="an-card-head">
@@ -337,6 +488,16 @@ export function AnalyticsHome() {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+// One small stat tile in the fun-stats grid.
+function FunTile({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="an-funtile">
+      <span className="an-funtile-val">{value}</span>
+      <span className="an-funtile-label">{label}</span>
     </div>
   );
 }

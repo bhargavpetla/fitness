@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updatePlanDay, addExerciseLog } from "@/lib/db";
 import { thumbUrlFromKey, MEDIA_ATTRIBUTION } from "@/lib/exerciseLibrary";
+import { DetailSheet } from "@/components/DetailSheet";
 import { fx } from "@/lib/fx";
 import type { AiPlanDay, WorkoutDayPayload, PlanExercise, ParsedExercise } from "@/lib/types";
 
@@ -33,8 +34,10 @@ export function WorkoutDay({
 }) {
   const router = useRouter();
   const payload = day.payload as WorkoutDayPayload;
+  // Defensive: a malformed / mismatched payload must not throw during render.
+  const planExercises = payload?.exercises ?? [];
   const [actuals, setActuals] = useState<Actual[]>(
-    payload.exercises.map((e) => ({ weight: e.weight_kg == null ? "" : String(e.weight_kg), reps: e.reps, sets: e.sets }))
+    planExercises.map((e) => ({ weight: e.weight_kg == null ? "" : String(e.weight_kg), reps: e.reps, sets: e.sets }))
   );
   const [adjusting, setAdjusting] = useState(false);
   const [howto, setHowto] = useState<PlanExercise | null>(null);
@@ -94,7 +97,7 @@ export function WorkoutDay({
   async function logWorkout() {
     setBusy(true);
     try {
-      const exercises = payload.exercises.map((e, i) => {
+      const exercises = planExercises.map((e, i) => {
         const a = actuals[i];
         const w = a.weight.trim() === "" ? null : Number(a.weight) || null;
         const set_list = Array.from({ length: a.sets }, () => ({ weight_kg: w, reps: a.reps, each_side: false }));
@@ -161,22 +164,31 @@ export function WorkoutDay({
         {payload.note && <div className="plan-note">💡 {payload.note}</div>}
       </div>
 
-      {payload.exercises.map((e, i) => (
+      {planExercises.map((e, i) => (
         <div key={i} className="card plan-ex" style={{ animation: "none" }}>
-          <div className="live-ex-head" style={{ padding: 0 }}>
-            <button className="live-ex-thumb" onClick={() => setHowto(e)} aria-label={`How to do ${e.name}`}>
+          {/* Whole row is the tap target now — tapping the name (not just the
+              thumbnail) opens the how-to animation + steps. */}
+          <button
+            type="button"
+            className="live-ex-head plan-ex-head"
+            style={{ padding: 0 }}
+            onClick={() => { fx.tap(); setHowto(e); }}
+            aria-label={`How to do ${e.name}`}
+          >
+            <span className="live-ex-thumb">
               {e.media ? <img src={thumbUrlFromKey(e.media)} alt="" loading="lazy" /> : <span className="picker-thumb-ph">✦</span>}
-            </button>
+            </span>
             <span className="live-ex-text">
               <span className="live-ex-name">{e.name}</span>
               <span className="live-ex-sub">
                 {adjusting
                   ? "adjust below"
-                  : `${actuals[i].sets} × ${actuals[i].reps}${actuals[i].weight.trim() !== "" ? ` @ ${actuals[i].weight} kg` : ""}`}
+                  : `${actuals[i].sets} × ${repTarget(e, actuals[i].reps)}${actuals[i].weight.trim() !== "" ? ` @ ${actuals[i].weight} kg` : ""}`}
                 {e.note ? ` · ${e.note}` : ""}
               </span>
             </span>
-          </div>
+            <span className="plan-ex-how">How&nbsp;to&nbsp;›</span>
+          </button>
 
           {adjusting && !locked && !day.completed && (
             <div className="plan-adjust">
@@ -246,6 +258,16 @@ export function WorkoutDay({
   }
 }
 
+// Target rep display: a range ("6–8") when the coach set one, else the single
+// rep number. The user still logs one concrete number within the range.
+function repTarget(e: PlanExercise, fallbackReps: number): string {
+  const lo = e.rep_low;
+  const hi = e.rep_high;
+  if (lo != null && hi != null && hi > lo) return `${lo}–${hi}`;
+  if (lo != null) return String(lo);
+  return String(fallbackReps);
+}
+
 function AdjustField({
   label,
   value,
@@ -276,37 +298,56 @@ function AdjustField({
   );
 }
 
-// Animation + steps for a planned exercise, same pattern as the live logger.
+// Animation + rep scheme + how-to steps for a planned exercise, in the shared
+// frosted-glass detail popup.
 function PlanHowto({ exercise, onClose }: { exercise: PlanExercise; onClose: () => void }) {
+  const reps = repTarget(exercise, exercise.reps);
   return (
-    <>
-      <div className="sheet-backdrop" onClick={onClose} />
-      <div className="sheet" role="dialog" aria-modal="true">
-        <div className="ex-detail-hero">
-          {exercise.media ? (
-            <img src={`/exercise-media/videos/${exercise.media}.gif`} alt={`${exercise.name} animation`} />
-          ) : (
-            <span className="ex-detail-hero-ph">✦</span>
-          )}
-        </div>
-        <h3 style={{ textTransform: "capitalize" }}>{exercise.name}</h3>
-        {exercise.primary_muscle && (
-          <div className="ex-detail-tags" style={{ marginBottom: 8 }}>
-            <span className="pill on">{exercise.primary_muscle}</span>
-          </div>
+    <DetailSheet title={<span style={{ textTransform: "capitalize" }}>{exercise.name}</span>} onClose={onClose}>
+      <div className="ex-detail-hero glass-hero">
+        {exercise.media ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={`/exercise-media/videos/${exercise.media}.gif`} alt={`${exercise.name} animation`} />
+        ) : (
+          <span className="ex-detail-hero-ph">✦</span>
         )}
-        {(exercise.steps?.length ?? 0) > 0 ? (
+      </div>
+
+      <div className="ex-stat-row">
+        <div className="ex-stat">
+          <span className="ex-stat-val">{exercise.sets}</span>
+          <span className="ex-stat-label">sets</span>
+        </div>
+        <div className="ex-stat">
+          <span className="ex-stat-val">{reps}</span>
+          <span className="ex-stat-label">reps</span>
+        </div>
+        <div className="ex-stat">
+          <span className="ex-stat-val">{exercise.weight_kg != null ? exercise.weight_kg : "BW"}</span>
+          <span className="ex-stat-label">{exercise.weight_kg != null ? "kg" : "bodyweight"}</span>
+        </div>
+      </div>
+
+      {exercise.primary_muscle && (
+        <div className="ex-detail-tags" style={{ marginBottom: 4 }}>
+          <span className="pill on">{exercise.primary_muscle}</span>
+        </div>
+      )}
+      {exercise.note && <div className="plan-note" style={{ marginTop: 10 }}>💡 {exercise.note}</div>}
+
+      {(exercise.steps?.length ?? 0) > 0 ? (
+        <>
+          <div className="detail-h">How to do it</div>
           <ol className="ex-howto-steps">
             {exercise.steps!.map((s, i) => (
               <li key={i}>{s}</li>
             ))}
           </ol>
-        ) : (
-          <p className="muted" style={{ fontSize: 14 }}>No guide for this one — trust your form and go steady.</p>
-        )}
-        {exercise.media && <p className="media-credit">{MEDIA_ATTRIBUTION}</p>}
-        <button className="btn btn-ghost" onClick={onClose}>Close</button>
-      </div>
-    </>
+        </>
+      ) : (
+        <p className="muted" style={{ fontSize: 14 }}>No guide for this one — trust your form and go steady.</p>
+      )}
+      {exercise.media && <p className="media-credit">{MEDIA_ATTRIBUTION}</p>}
+    </DetailSheet>
   );
 }

@@ -177,10 +177,19 @@ export function mapWorkoutDays(raw: RawWorkoutPlan, expected: number): WorkoutDa
       ? []
       : (d.exercises ?? []).map((e) => {
           const m = matchExercise(String(e.name ?? ""));
+          const reps = Math.max(1, Math.round(Number(e.reps) || 10));
+          // Progressive-overload rep range. Prefer the coach's explicit range;
+          // otherwise derive a window around the target so heavy lifts land
+          // ~6–8, accessories ~8–10, isolation ~10–12 — never a flat number.
+          const repHigh = e.rep_high != null ? Math.max(1, Math.round(Number(e.rep_high))) : reps;
+          const repLowRaw = e.rep_low != null ? Math.round(Number(e.rep_low)) : reps - 2;
+          const repLow = Math.max(1, Math.min(repLowRaw, repHigh));
           return {
             name: String(e.name ?? "Exercise"),
             sets: Math.max(1, Math.round(Number(e.sets) || 3)),
-            reps: Math.max(1, Math.round(Number(e.reps) || 10)),
+            reps: repHigh,
+            rep_low: repLow,
+            rep_high: repHigh,
             weight_kg: e.weight_kg == null ? null : r1(e.weight_kg),
             note: e.note ? String(e.note) : null,
             media: m?.media ?? null,

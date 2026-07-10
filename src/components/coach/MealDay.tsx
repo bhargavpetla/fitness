@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { updatePlanDay, addFoodLog, fetchDailyTotals } from "@/lib/db";
 import { fileToDataUrl, uploadPhoto, signedUrl } from "@/lib/photos";
 import { Icon } from "@/components/Icon";
+import { DetailSheet } from "@/components/DetailSheet";
+import { MacroTable } from "@/components/MacroTable";
 import { fx } from "@/lib/fx";
 import type { AiPlanDay, MealDayPayload, PlanMeal } from "@/lib/types";
 
@@ -23,7 +25,11 @@ export function MealDay({
   onToast: (msg: string) => void;
 }) {
   const payload = day.payload as MealDayPayload;
-  const checked: boolean[] = payload.meals.map((_, i) => day.actual?.checked?.[i] ?? false);
+  // Defensive: never assume the AI payload is well-formed. A missing meals /
+  // totals must degrade gracefully, not throw during render.
+  const meals = payload?.meals ?? [];
+  const totals = payload?.totals ?? { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0 };
+  const checked: boolean[] = meals.map((_, i) => day.actual?.checked?.[i] ?? false);
   const [busy, setBusy] = useState<string | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [logged, setLogged] = useState<{ calories: number; protein_g: number } | null>(null);
@@ -123,10 +129,10 @@ export function MealDay({
       {payload.note && <div className="plan-note">💡 {payload.note}</div>}
 
       <div className="plan-day-totals">
-        <span>{Math.round(payload.totals.calories)} kcal</span>
-        <span>P {Math.round(payload.totals.protein_g)}g</span>
-        <span>C {Math.round(payload.totals.carbs_g)}g</span>
-        <span>F {Math.round(payload.totals.fat_g)}g</span>
+        <span>{Math.round(totals.calories)} kcal</span>
+        <span>P {Math.round(totals.protein_g)}g</span>
+        <span>C {Math.round(totals.carbs_g)}g</span>
+        <span>F {Math.round(totals.fat_g)}g</span>
       </div>
 
       {logged && logged.calories > 0 && (
@@ -135,7 +141,7 @@ export function MealDay({
         </div>
       )}
 
-      {payload.meals.map((m, i) => (
+      {meals.map((m, i) => (
         <MealCard
           key={i}
           meal={m}
@@ -188,20 +194,23 @@ function MealCard({
   onToggle: () => void;
   onLog: () => void;
 }) {
-  const [showRecipe, setShowRecipe] = useState(false);
+  const [detail, setDetail] = useState(false);
+  const hasRecipe = !!meal.recipe && meal.recipe.steps.length > 0;
 
   return (
     <div className={`meal-card ${checked ? "checked" : ""}`}>
       <div className="meal-card-top">
-        <DishImage imageKey={meal.image_key} src={meal.image_src} />
-        <div className="meal-card-text">
-          <span className="meal-slot">{meal.slot}</span>
-          <div className="meal-card-name">
-            {meal.name} {meal.verified && <span className="verified" title="Macros from the Indian Nutrient Databank">✓ measured</span>}
-          </div>
-          <div className="meal-card-desc">{meal.desc}</div>
-          {meal.portion && <div className="meal-card-portion">{meal.portion}</div>}
-        </div>
+        <button className="meal-card-main" onClick={() => { fx.tap(); setDetail(true); }} aria-label={`Details for ${meal.name}`}>
+          <DishImage imageKey={meal.image_key} src={meal.image_src} />
+          <span className="meal-card-text">
+            <span className="meal-slot">{meal.slot}</span>
+            <span className="meal-card-name">
+              {meal.name} {meal.verified && <span className="verified" title="Macros from the Indian Nutrient Databank">✓ measured</span>}
+            </span>
+            <span className="meal-card-desc">{meal.desc}</span>
+            {meal.portion && <span className="meal-card-portion">{meal.portion}</span>}
+          </span>
+        </button>
         {!locked && (
           <button className={`meal-check ${checked ? "on" : ""}`} onClick={onToggle} aria-label="Mark eaten">
             ✓
@@ -209,7 +218,7 @@ function MealCard({
         )}
       </div>
 
-      <div className="macros-mini">
+      <div className="macros-mini meal-macros">
         <span>{Math.round(meal.calories)} kcal</span>
         <span><i className="dot" style={{ background: "var(--protein)" }} />{meal.protein_g}g</span>
         <span><i className="dot" style={{ background: "var(--carbs)" }} />{meal.carbs_g}g</span>
@@ -217,11 +226,9 @@ function MealCard({
       </div>
 
       <div className="meal-card-foot">
-        {meal.recipe && meal.recipe.steps.length > 0 && (
-          <button className="meal-mini-btn" onClick={() => { fx.tap(); setShowRecipe((v) => !v); }}>
-            <Icon name="restaurant-outline" size={13} /> Recipe {meal.recipe.time_min ? `· ${meal.recipe.time_min} min` : ""} {showRecipe ? "▴" : "▾"}
-          </button>
-        )}
+        <button className="meal-mini-btn" onClick={() => { fx.tap(); setDetail(true); }}>
+          <Icon name="restaurant-outline" size={13} /> {hasRecipe ? `Recipe${meal.recipe!.time_min ? ` · ${meal.recipe!.time_min} min` : ""}` : "Details"} ›
+        </button>
         {!locked && (
           <button className="meal-mini-btn log" onClick={onLog} disabled={busy}>
             {busy ? <span className="spinner" style={{ borderTopColor: "var(--accent)", width: 12, height: 12 }} /> : "＋ Log it"}
@@ -229,12 +236,38 @@ function MealCard({
         )}
       </div>
 
-      {showRecipe && meal.recipe && (
-        <ol className="ex-howto-steps" style={{ marginTop: 10 }}>
-          {meal.recipe.steps.map((s, i) => (
-            <li key={i}>{s}</li>
-          ))}
-        </ol>
+      {detail && (
+        <DetailSheet title={<span style={{ textTransform: "capitalize" }}>{meal.name}</span>} onClose={() => setDetail(false)}>
+          <span className="meal-slot" style={{ display: "block", marginBottom: 10 }}>{meal.slot}</span>
+          <DishImage imageKey={meal.image_key} src={meal.image_src} big />
+          {meal.desc && <p className="detail-lede">{meal.desc}</p>}
+          {meal.portion && (
+            <div className="detail-portion">
+              🍽 {meal.portion}
+              {meal.verified && <span className="verified">✓ measured</span>}
+            </div>
+          )}
+          <MacroTable calories={meal.calories} protein_g={meal.protein_g} carbs_g={meal.carbs_g} fat_g={meal.fat_g} />
+          {hasRecipe && (
+            <>
+              <div className="detail-h">Recipe{meal.recipe!.time_min ? ` · ${meal.recipe!.time_min} min` : ""}</div>
+              <ol className="ex-howto-steps">
+                {meal.recipe!.steps.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ol>
+            </>
+          )}
+          {!locked && (
+            <button
+              className="btn btn-primary detail-cta"
+              onClick={() => { onLog(); setDetail(false); }}
+              disabled={busy}
+            >
+              ＋ Log this meal into today
+            </button>
+          )}
+        </DetailSheet>
       )}
     </div>
   );
@@ -242,7 +275,8 @@ function MealCard({
 
 // Dish photo, self-hosted after first view: asks the server to cache the
 // dataset image into Supabase storage and remembers the result per-session.
-function DishImage({ imageKey, src }: { imageKey?: string | null; src?: string | null }) {
+// `big` renders the hero variant inside the detail popup.
+function DishImage({ imageKey, src, big = false }: { imageKey?: string | null; src?: string | null; big?: boolean }) {
   const [url, setUrl] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -282,11 +316,13 @@ function DishImage({ imageKey, src }: { imageKey?: string | null; src?: string |
     };
   }, [imageKey, src]);
 
+  const cls = big ? "meal-hero" : "meal-img";
   if (!url || failed)
     return (
-      <div className="meal-img ph">
-        <Icon name="restaurant-outline" size={24} />
-      </div>
+      <span className={`${cls} ph`}>
+        <Icon name="restaurant-outline" size={big ? 40 : 24} />
+      </span>
     );
-  return <img className="meal-img" src={url} alt="" loading="lazy" onError={() => setFailed(true)} />;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img className={cls} src={url} alt="" loading="lazy" onError={() => setFailed(true)} />;
 }

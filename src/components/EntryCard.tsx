@@ -2,15 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { signedUrl } from "@/lib/photos";
+import { DetailSheet } from "@/components/DetailSheet";
+import { MacroTable } from "@/components/MacroTable";
 import type { FoodLog } from "@/lib/types";
 
-// A food entry that expands on tap to show per-item breakdown, the photo, the
-// AI-estimated vitamins, and a delete button.
+// A food entry. The card is a calm summary; tapping it opens a big frosted-glass
+// popup with the photo, a readable macro table, the per-item breakdown, the
+// AI-estimated vitamins, and delete.
 export function EntryCard({ food, onDelete }: { food: FoodLog; onDelete: () => void }) {
   const [open, setOpen] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
 
-  // Resolve the private photo to a signed URL only when expanded.
+  // Resolve the private photo to a signed URL only when the popup opens.
   useEffect(() => {
     let active = true;
     if (open && food.photo_url && !photo) {
@@ -28,48 +31,64 @@ export function EntryCard({ food, onDelete }: { food: FoodLog; onDelete: () => v
   const vitaminKeys = Object.keys(vitamins);
 
   return (
-    <div className="card">
-      <div className="card-top" onClick={() => setOpen((o) => !o)} style={{ cursor: "pointer" }}>
-        <div>
-          <div className="meal">{food.meal_label ?? "meal"}</div>
-          <div className="sub">{food.raw_input}</div>
+    <>
+      <button className="card entry-card" onClick={() => setOpen(true)}>
+        <div className="card-top">
+          <div>
+            <div className="meal">{food.meal_label ?? "meal"}</div>
+            <div className="sub">{food.raw_input}</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div className="kcal">{Math.round(Number(food.calories))} kcal</div>
+            <div className="muted" style={{ fontSize: 11 }}>tap for details ›</div>
+          </div>
         </div>
-        <div style={{ textAlign: "right" }}>
-          <div className="kcal">{Math.round(Number(food.calories))} kcal</div>
-          <div className="muted" style={{ fontSize: 11 }}>{open ? "tap to close" : "tap for details"}</div>
+        <div className="macros-mini">
+          <span><i className="dot" style={{ background: "var(--protein)" }} />P {Math.round(Number(food.protein_g))}g</span>
+          <span><i className="dot" style={{ background: "var(--carbs)" }} />C {Math.round(Number(food.carbs_g))}g</span>
+          <span><i className="dot" style={{ background: "var(--fat)" }} />F {Math.round(Number(food.fat_g))}g</span>
         </div>
-      </div>
-
-      <div className="macros-mini">
-        <span><i className="dot" style={{ background: "var(--protein)" }} />P {Math.round(Number(food.protein_g))}g</span>
-        <span><i className="dot" style={{ background: "var(--carbs)" }} />C {Math.round(Number(food.carbs_g))}g</span>
-        <span><i className="dot" style={{ background: "var(--fat)" }} />F {Math.round(Number(food.fat_g))}g</span>
-      </div>
+      </button>
 
       {open && (
-        <div style={{ marginTop: 12, borderTop: "1px solid var(--line)", paddingTop: 12 }}>
+        <DetailSheet
+          title={<span style={{ textTransform: "capitalize" }}>{food.meal_label ?? "Meal"}</span>}
+          onClose={() => setOpen(false)}
+        >
+          {food.raw_input && <p className="detail-lede">{food.raw_input}</p>}
           {photo && (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={photo} alt="meal" style={{ width: "100%", maxHeight: 220, objectFit: "cover", borderRadius: 12, marginBottom: 12 }} />
+            <img src={photo} alt="meal" className="detail-photo" />
           )}
+
+          <MacroTable
+            calories={Number(food.calories)}
+            protein_g={Number(food.protein_g)}
+            carbs_g={Number(food.carbs_g)}
+            fat_g={Number(food.fat_g)}
+          />
 
           {items.length > 0 && (
             <>
-              <div className="label" style={{ marginTop: 0 }}>Items</div>
-              {items.map((it, i) => (
-                <div key={i} className="macros-mini" style={{ justifyContent: "space-between" }}>
-                  <span style={{ color: "var(--ink)" }}>
-                    {it.name}{it.grams != null ? ` · ${it.grams}g` : ""}
-                  </span>
-                  <span>{Math.round(it.calories)} kcal · P{it.protein_g} C{it.carbs_g} F{it.fat_g}</span>
-                </div>
-              ))}
+              <div className="detail-h">Items</div>
+              <div className="detail-items">
+                {items.map((it, i) => (
+                  <div key={i} className="detail-item">
+                    <span className="detail-item-name">
+                      {it.name}{it.grams != null ? ` · ${it.grams}g` : ""}
+                    </span>
+                    <span className="detail-item-macros">
+                      {Math.round(it.calories)} kcal · P{it.protein_g} C{it.carbs_g} F{it.fat_g}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </>
           )}
 
           {vitaminKeys.length > 0 && (
             <>
-              <div className="label">Vitamins &amp; minerals (est.)</div>
+              <div className="detail-h">Vitamins &amp; minerals (est.)</div>
               <div className="pill-group">
                 {vitaminKeys.map((k) => (
                   <span key={k} className="pill" style={{ fontWeight: 500 }}>{k}: {vitamins[k]}</span>
@@ -79,16 +98,18 @@ export function EntryCard({ food, onDelete }: { food: FoodLog; onDelete: () => v
           )}
 
           <button
-            className="btn btn-ghost"
-            style={{ color: "#b42318", marginTop: 14 }}
+            className="btn btn-ghost detail-delete"
             onClick={() => {
-              if (confirm("Delete this entry?")) onDelete();
+              if (confirm("Delete this entry?")) {
+                onDelete();
+                setOpen(false);
+              }
             }}
           >
             Delete entry
           </button>
-        </div>
+        </DetailSheet>
       )}
-    </div>
+    </>
   );
 }
