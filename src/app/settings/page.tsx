@@ -37,9 +37,15 @@ export default function Settings() {
   const [msg, setMsg] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [sounds, setSounds] = useState(true);
+  const [pet, setPet] = useState(true);
 
   useEffect(() => {
     setSounds(!fxMuted());
+    try {
+      setPet(localStorage.getItem("macha-off") !== "1");
+    } catch {
+      /* ignore */
+    }
   }, []);
   const [medicalDocs, setMedicalDocs] = useState<SettingsMedicalDocument[]>([]);
   const [uploadingMedicalDoc, setUploadingMedicalDoc] = useState(false);
@@ -440,19 +446,39 @@ export default function Settings() {
         </Section>
 
         <Section title="Sounds & feel">
-          <button
-            className={`pill ${sounds ? "on" : ""}`}
-            onClick={() => {
-              const next = !sounds;
-              setSounds(next);
-              setFxMuted(!next);
-              if (next) fx.pop();
-            }}
-          >
-            <Icon name="musical-notes-outline" size={14} /> Sounds {sounds ? "on" : "off"}
-          </button>
+          <div className="pill-group">
+            <button
+              className={`pill ${sounds ? "on" : ""}`}
+              onClick={() => {
+                const next = !sounds;
+                setSounds(next);
+                setFxMuted(!next);
+                if (next) fx.pop();
+              }}
+            >
+              <Icon name="musical-notes-outline" size={14} /> Sounds {sounds ? "on" : "off"}
+            </button>
+            <button
+              className={`pill ${pet ? "on" : ""}`}
+              onClick={() => {
+                const next = !pet;
+                setPet(next);
+                try {
+                  localStorage.setItem("macha-off", next ? "0" : "1");
+                } catch {
+                  /* ignore */
+                }
+                window.dispatchEvent(new CustomEvent("macha-pref"));
+                if (next) fx.chirp();
+                else fx.tap();
+              }}
+            >
+              🌱 Macha {pet ? "on" : "off"}
+            </button>
+          </div>
           <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
-            Little clicks and chimes when you log sets, complete days, and flip modes.
+            Little clicks and chimes when you log sets, complete days, and flip modes. Macha is the pet
+            wandering the top of your screen — it reacts to your day (and topples if you tap it too hard).
           </p>
         </Section>
 

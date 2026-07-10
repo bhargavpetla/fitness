@@ -63,7 +63,7 @@ function note(
   osc.stop(t0 + dur + 0.02);
 }
 
-export type FxKind = "tap" | "pop" | "success" | "switch" | "remove" | "chirp";
+export type FxKind = "tap" | "pop" | "success" | "switch" | "remove" | "chirp" | "giggle" | "thud";
 
 // tap     — soft tick: tabs, chips, toggles
 // pop     — satisfying blip: logging a set, adding an exercise, checking a meal
@@ -71,7 +71,19 @@ export type FxKind = "tap" | "pop" | "success" | "switch" | "remove" | "chirp";
 // switch  — the mode flip: quick down-up sweep
 // remove  — low thud: deletions, taking things back
 // chirp   — Macha's happy squeak: petting the mascot
+// giggle  — Macha's triple-squeak laugh
+// thud    — Macha toppling over (tapped too hard)
 export function play(kind: FxKind): void {
+  // The companion pet reacts to app events by listening to this stream —
+  // dispatched before the mute check, because muting sounds shouldn't
+  // lobotomise the pet.
+  if (typeof window !== "undefined") {
+    try {
+      window.dispatchEvent(new CustomEvent<FxKind>("fx-play", { detail: kind }));
+    } catch {
+      /* ignore */
+    }
+  }
   if (fxMuted()) return;
   const ac = audio();
   if (!ac) return;
@@ -98,6 +110,17 @@ export function play(kind: FxKind): void {
       // Two quick upward squeaks — small, bright, alive.
       note(ac, { freq: 880, to: 1420, type: "sine", dur: 0.07, vol: 0.11 });
       note(ac, { freq: 1180, to: 1760, type: "sine", at: 0.09, dur: 0.09, vol: 0.09 });
+      break;
+    case "giggle":
+      // Triple squeak, rising — Macha cracking up.
+      note(ac, { freq: 980, to: 1300, type: "sine", dur: 0.06, vol: 0.1 });
+      note(ac, { freq: 1150, to: 1500, type: "sine", at: 0.09, dur: 0.06, vol: 0.1 });
+      note(ac, { freq: 1350, to: 1800, type: "sine", at: 0.18, dur: 0.08, vol: 0.09 });
+      break;
+    case "thud":
+      // Tip-over: a low drop and a small bounce.
+      note(ac, { freq: 190, to: 70, type: "triangle", dur: 0.16, vol: 0.16 });
+      note(ac, { freq: 110, to: 85, type: "triangle", at: 0.2, dur: 0.06, vol: 0.1 });
       break;
   }
 }
@@ -136,5 +159,13 @@ export const fx = {
   chirp: () => {
     play("chirp");
     buzz([6, 24, 6]);
+  },
+  giggle: () => {
+    play("giggle");
+    buzz([5, 14, 5, 14, 5]);
+  },
+  thud: () => {
+    play("thud");
+    buzz([28, 46, 22]);
   },
 };

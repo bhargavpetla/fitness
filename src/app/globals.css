@@ -2517,6 +2517,81 @@ textarea {
   100% { transform: translateY(54px) rotate(230deg); opacity: 0; }
 }
 
+/* crying: tears roll and fall */
+.macha .m-tear { transform-box: fill-box; animation: machaTear 1.3s ease-in infinite; opacity: 0; }
+.macha .m-tear2 { animation-delay: 0.65s; }
+@keyframes machaTear {
+  0% { transform: translateY(0); opacity: 0; }
+  20% { opacity: 0.95; }
+  100% { transform: translateY(15px); opacity: 0; }
+}
+
+/* toppling over: tip past the balance point, bounce, settle on its side */
+.macha.macha-fallen {
+  animation: machaFall 0.7s cubic-bezier(0.34, 1.2, 0.5, 1) forwards;
+  transform-origin: 58% 86%;
+}
+@keyframes machaFall {
+  0% { transform: rotate(0deg); }
+  45% { transform: rotate(98deg); }
+  62% { transform: rotate(82deg); }
+  78% { transform: rotate(93deg); }
+  100% { transform: rotate(90deg); }
+}
+/* while down: no breathing, no waving — it's had enough */
+.macha-fallen .m-core, .macha-fallen .m-leaf, .macha-fallen .m-wave, .macha-fallen .m-pump {
+  animation-play-state: paused;
+}
+/* the stars circle while it's down */
+.macha-fallen .m-z { animation: machaZ 1.6s linear infinite; }
+
+/* waddle while walking — rocks side to side with tiny hops */
+.macha-walking .m-core { animation: machaWaddle 0.44s ease-in-out infinite; }
+.macha-walking .m-leaf { animation-duration: 0.9s; }
+@keyframes machaWaddle {
+  0%, 100% { transform: rotate(-4deg) translateY(0); }
+  50% { transform: rotate(4deg) translateY(-2.5px); }
+}
+
+/* ---- the companion: lives along the top of the screen ---- */
+.macha-companion {
+  position: fixed;
+  top: calc(env(safe-area-inset-top) + 2px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+.macha-companion-walker {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  will-change: transform;
+}
+.macha-companion .mascot-tap { pointer-events: auto; }
+.macha-companion .mascot-img { filter: drop-shadow(0 6px 12px rgba(47, 122, 77, 0.22)); }
+.macha-companion .mascot-bubble {
+  pointer-events: auto;
+  position: absolute;
+  top: calc(100% + 8px);
+  max-width: 220px;
+  width: max-content;
+  font-size: 12.5px;
+  padding: 8px 12px;
+}
+/* bubble hangs below the pet, so the tail points up */
+.mascot-bubble.below::after {
+  bottom: auto;
+  top: -6px;
+  border: none;
+  border-left: 1px solid var(--accent);
+  border-top: 1px solid var(--accent);
+  transform: translateX(-50%) rotate(45deg);
+}
+
 /* ---- staggered card entrance (transform/opacity only — stays at 60fps) ---- */
 .card, .meal-card { animation-fill-mode: both; }
 .card:nth-child(2), .meal-card:nth-child(2) { animation-delay: 0.05s; }
