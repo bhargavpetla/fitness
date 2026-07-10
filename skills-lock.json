@@ -1,11 +1,29 @@
 {
   "version": 1,
   "skills": {
+    "3d-spatial": {
+      "source": "dylantarre/animation-principles",
+      "sourceType": "github",
+      "skillPath": "skills/01-by-domain/3d-spatial/SKILL.md",
+      "computedHash": "17e0f430bf15297a7152d2c1ef3f03aba6f16845a52e0d1f2732e825b3cce330"
+    },
     "frontend-design": {
       "source": "anthropics/skills",
       "sourceType": "github",
       "skillPath": "skills/frontend-design/SKILL.md",
       "computedHash": "93f53fd1c0352d3d7ec17b8f73d7351bf76f4821e55d123c9d2abc2c53ba48e4"
+    },
+    "lottie-animations": {
+      "source": "freshtechbro/claudedesignskills",
+      "sourceType": "github",
+      "skillPath": ".claude/skills/lottie-animations/SKILL.md",
+      "computedHash": "e00a91be81589b19452e1105b82759d68772f47e4c4775e0131eb35d65be9ee1"
+    },
+    "svg-animations": {
+      "source": "supermemoryai/skills",
+      "sourceType": "github",
+      "skillPath": "svg-animations/SKILL.md",
+      "computedHash": "f25711af04ba7a0f8e662f41cdf707423102eef303dfd3dc7d48d35bb83c7ec4"
     }
   }
 }

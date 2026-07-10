@@ -47,6 +47,9 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Run on everything except static assets, the SW, and icons.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|icons/).*)"],
+  // Run on everything except static assets, the SW, and public media. Keeping
+  // mascot/ and exercise-media/ out matters twice over: the login page shows
+  // Macha unauthenticated, and every exercise GIF request was paying a
+  // Supabase auth round-trip for nothing.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.json|sw.js|icons/|mascot/|exercise-media/).*)"],
 };

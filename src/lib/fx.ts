@@ -63,13 +63,14 @@ function note(
   osc.stop(t0 + dur + 0.02);
 }
 
-export type FxKind = "tap" | "pop" | "success" | "switch" | "remove";
+export type FxKind = "tap" | "pop" | "success" | "switch" | "remove" | "chirp";
 
 // tap     — soft tick: tabs, chips, toggles
 // pop     — satisfying blip: logging a set, adding an exercise, checking a meal
 // success — rising two-note chime: day complete, workout saved, plan ready
 // switch  — the mode flip: quick down-up sweep
 // remove  — low thud: deletions, taking things back
+// chirp   — Macha's happy squeak: petting the mascot
 export function play(kind: FxKind): void {
   if (fxMuted()) return;
   const ac = audio();
@@ -92,6 +93,11 @@ export function play(kind: FxKind): void {
       break;
     case "remove":
       note(ac, { freq: 220, to: 120, type: "triangle", dur: 0.12, vol: 0.12 });
+      break;
+    case "chirp":
+      // Two quick upward squeaks — small, bright, alive.
+      note(ac, { freq: 880, to: 1420, type: "sine", dur: 0.07, vol: 0.11 });
+      note(ac, { freq: 1180, to: 1760, type: "sine", at: 0.09, dur: 0.09, vol: 0.09 });
       break;
   }
 }
@@ -126,5 +132,9 @@ export const fx = {
   remove: () => {
     play("remove");
     buzz(14);
+  },
+  chirp: () => {
+    play("chirp");
+    buzz([6, 24, 6]);
   },
 };

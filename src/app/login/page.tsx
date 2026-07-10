@@ -35,7 +35,14 @@ function LoginInner() {
   return (
     <div className="app-shell">
       <div className="center-screen">
-        <div style={{ fontSize: 40 }}>🍃</div>
+        {/* Macha says hi — generated reference art, vendored in public/mascot */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/mascot/macha-hello.png"
+          alt=""
+          width={210}
+          style={{ maxWidth: "70%", height: "auto", mixBlendMode: "multiply" }}
+        />
         <h1 style={{ margin: 0, fontSize: 26, letterSpacing: "-0.02em" }}>Daily Intake</h1>
         <p className="muted" style={{ margin: "0 0 8px", maxWidth: 280 }}>
           Your private food and fitness tracker. Sign in to get started.

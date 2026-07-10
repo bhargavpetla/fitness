@@ -2366,20 +2366,17 @@ textarea {
 .an-funtile-val { font-size: 18px; font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .an-funtile-label { font-size: 10.5px; color: var(--ink-2); font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
 
-/* ---- Macha, the pet: gentle idle float + a speech bubble ---- */
+/* ============================================================================
+   Macha, the pet — a rigged SVG character (see components/Mascot.tsx).
+   Disney-principled CSS keyframes: squash & stretch on the core, anticipation
+   before the cheer jump, secondary action on the leaf, follow-through on the
+   ground shadow. All transform/opacity — 60fps on phones.
+   ============================================================================ */
 .mascot { display: flex; flex-direction: column-reverse; align-items: center; gap: 12px; }
+.mascot-tap { border: none; background: transparent; padding: 0; cursor: pointer; }
 .mascot-img {
   display: block;
-  border-radius: 26px;
-  animation: mascotFloat 3.4s ease-in-out infinite;
   filter: drop-shadow(0 10px 18px rgba(47, 122, 77, 0.16));
-  will-change: transform;
-}
-.mascot-ph {
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent-soft), #f0e9fe);
 }
 .mascot-bubble {
   position: relative;
@@ -2407,9 +2404,117 @@ textarea {
   border-bottom: 1px solid var(--line);
   transform: translateX(-50%) rotate(45deg);
 }
-@keyframes mascotFloat {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-7px); }
+/* when Macha itself is talking (petted), the bubble warms up */
+.mascot-bubble.mascot-say { border-color: var(--accent); box-shadow: 0 6px 18px rgba(47, 122, 77, 0.18); }
+
+/* every animated part transforms around its own box */
+.macha .m-core, .macha .m-leaf, .macha .m-eyes, .macha .m-wave, .macha .m-pump,
+.macha .m-shadow, .macha .m-aura, .macha .m-z, .macha .m-conf {
+  transform-box: fill-box;
+}
+
+/* idle: the whole character breathes from its base (squash & stretch) */
+.macha .m-core {
+  transform-origin: 50% 100%;
+  animation: machaBreathe 3.6s ease-in-out infinite;
+}
+.macha-sleep .m-core { animation-duration: 5.2s; }
+@keyframes machaBreathe {
+  0%, 100% { transform: scale(1, 1); }
+  50% { transform: scale(1.015, 0.975); }
+}
+
+/* leaf: secondary action, sways against the breathing */
+.macha .m-leaf {
+  transform-origin: 50% 100%;
+  animation: machaSway 3s ease-in-out infinite alternate;
+}
+@keyframes machaSway {
+  from { transform: rotate(-7deg); }
+  to { transform: rotate(9deg); }
+}
+
+/* blink cycle — open 90% of the time, a quick double-flutter */
+.macha .m-eyes {
+  transform-origin: 50% 50%;
+  animation: machaBlink 4.4s ease-in-out infinite;
+}
+@keyframes machaBlink {
+  0%, 90%, 96%, 100% { transform: scaleY(1); }
+  93% { transform: scaleY(0.06); }
+}
+
+/* hello: the wave, hinged at the shoulder */
+.macha .m-wave {
+  transform-origin: 25% 88%;
+  animation: machaWave 1.15s ease-in-out infinite;
+}
+@keyframes machaWave {
+  0%, 100% { transform: rotate(-10deg); }
+  50% { transform: rotate(24deg); }
+}
+
+/* flex: dumbbell pump */
+.macha .m-pump {
+  transform-origin: 30% 90%;
+  animation: machaPump 0.95s ease-in-out infinite;
+}
+@keyframes machaPump {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-5px) rotate(-7deg); }
+}
+
+/* cheer: anticipation squash → stretch up → landing squash; shadow follows */
+.macha-cheer .m-core { animation: machaJump 1.5s cubic-bezier(0.34, 1.3, 0.5, 1) infinite; }
+.macha-cheer .m-shadow { transform-origin: 50% 50%; animation: machaShadow 1.5s cubic-bezier(0.34, 1.3, 0.5, 1) infinite; }
+@keyframes machaJump {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  18% { transform: translateY(1px) scale(1.07, 0.9); }
+  42% { transform: translateY(-15px) scale(0.95, 1.08); }
+  64% { transform: translateY(0) scale(1.06, 0.93); }
+  80% { transform: translateY(0) scale(0.99, 1.02); }
+}
+@keyframes machaShadow {
+  0%, 100% { transform: scale(1); opacity: 0.09; }
+  42% { transform: scale(0.72); opacity: 0.04; }
+  64% { transform: scale(1.05); opacity: 0.1; }
+}
+
+/* tap reaction: one happy hop, whatever the pose */
+.macha.macha-excite .m-core { animation: machaJump 0.72s cubic-bezier(0.34, 1.3, 0.5, 1) 1; }
+.macha.macha-excite .m-leaf { animation-duration: 0.5s; }
+
+/* zen: pulsing aura */
+.macha .m-aura {
+  transform-origin: 50% 50%;
+  animation: machaAura 3s ease-in-out infinite;
+}
+@keyframes machaAura {
+  0%, 100% { opacity: 0.3; transform: scale(0.97); }
+  50% { opacity: 0.7; transform: scale(1.04); }
+}
+
+/* sleep: drifting z z z */
+.macha .m-z { animation: machaZ 2.7s linear infinite; opacity: 0; }
+.macha .m-z2 { animation-delay: 0.9s; }
+.macha .m-z3 { animation-delay: 1.8s; }
+@keyframes machaZ {
+  0% { transform: translate(0, 5px) scale(0.75); opacity: 0; }
+  25% { opacity: 0.85; }
+  100% { transform: translate(9px, -15px) scale(1.15); opacity: 0; }
+}
+
+/* cheer confetti rain */
+.macha .m-conf { animation: machaConf 1.6s ease-in infinite; opacity: 0; }
+.macha .m-c2 { animation-delay: 0.18s; }
+.macha .m-c3 { animation-delay: 0.42s; }
+.macha .m-c4 { animation-delay: 0.6s; }
+.macha .m-c5 { animation-delay: 0.84s; }
+.macha .m-c6 { animation-delay: 1.05s; }
+@keyframes machaConf {
+  0% { transform: translateY(-6px) rotate(0deg); opacity: 0; }
+  15% { opacity: 1; }
+  100% { transform: translateY(54px) rotate(230deg); opacity: 0; }
 }
 
 /* ---- staggered card entrance (transform/opacity only — stays at 60fps) ---- */
