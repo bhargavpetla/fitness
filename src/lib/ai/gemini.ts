@@ -603,3 +603,15 @@ export async function generateIllustration(prompt: string): Promise<string | nul
   }
   return null;
 }
+
+// A photorealistic dish photo for AI-Coach meals not covered by the recipe
+// dataset. Consistent framing so a plan's cards read as one set. Returns
+// base64 PNG data (no prefix) or null.
+export async function generateFoodImage(name: string, desc?: string): Promise<string | null> {
+  const prompt =
+    `Appetizing overhead food photograph of "${name}"${desc ? ` (${desc})` : ""}, ` +
+    `an Indian home-cooked dish plated simply on a plain ceramic plate or bowl, ` +
+    `soft natural daylight, shallow depth of field, fresh and wholesome, centered, ` +
+    `no text, no hands, no logos, realistic color.`;
+  return generateIllustration(prompt);
+}

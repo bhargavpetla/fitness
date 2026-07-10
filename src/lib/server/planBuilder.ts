@@ -22,6 +22,11 @@ import type {
 
 const r1 = (n: unknown) => Math.round(Number(n) * 10) / 10 || 0;
 
+// A storage-safe key from a dish name (matches the sanitising the meal-image
+// route does), so unmatched dishes get a stable slot for their generated photo.
+const slugifyName = (name: string) =>
+  name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 80) || "dish";
+
 export function dstr(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
@@ -141,10 +146,11 @@ export function feedbackNoteOf(kind: "meal" | "workout", fb: PlanFeedback | unde
 export function mapMealDays(raw: RawMealPlan, expected: number): MealDayPayload[] {
   return (raw.days ?? []).slice(0, expected).map((d) => {
     const meals: PlanMeal[] = (d.meals ?? []).map((m) => {
-      const rec = matchRecipe(String(m.name ?? ""));
+      const name = String(m.name ?? "Meal");
+      const rec = matchRecipe(name);
       return {
         slot: String(m.slot ?? "meal"),
-        name: String(m.name ?? "Meal"),
+        name,
         desc: String(m.desc ?? ""),
         portion: String(m.portion ?? ""),
         calories: r1(m.calories),
@@ -152,7 +158,10 @@ export function mapMealDays(raw: RawMealPlan, expected: number): MealDayPayload[
         carbs_g: r1(m.carbs_g),
         fat_g: r1(m.fat_g),
         verified: Boolean(m.verified),
-        image_key: rec ? imageKeyOf(rec) : null,
+        // Every meal gets a stable key. Matched dishes carry the dataset image
+        // as `image_src`; unmatched ones fall back to an AI-generated photo
+        // (the route caches both under this key).
+        image_key: rec ? imageKeyOf(rec) : slugifyName(name),
         image_src: rec?.image ?? null,
         recipe: rec && rec.steps.length ? { steps: rec.steps, time_min: rec.time_min } : null,
       };

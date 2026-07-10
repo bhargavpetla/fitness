@@ -201,7 +201,7 @@ function MealCard({
     <div className={`meal-card ${checked ? "checked" : ""}`}>
       <div className="meal-card-top">
         <button className="meal-card-main" onClick={() => { fx.tap(); setDetail(true); }} aria-label={`Details for ${meal.name}`}>
-          <DishImage imageKey={meal.image_key} src={meal.image_src} />
+          <DishImage imageKey={meal.image_key} src={meal.image_src} name={meal.name} desc={meal.desc} />
           <span className="meal-card-text">
             <span className="meal-slot">{meal.slot}</span>
             <span className="meal-card-name">
@@ -239,7 +239,7 @@ function MealCard({
       {detail && (
         <DetailSheet title={<span style={{ textTransform: "capitalize" }}>{meal.name}</span>} onClose={() => setDetail(false)}>
           <span className="meal-slot" style={{ display: "block", marginBottom: 10 }}>{meal.slot}</span>
-          <DishImage imageKey={meal.image_key} src={meal.image_src} big />
+          <DishImage imageKey={meal.image_key} src={meal.image_src} name={meal.name} desc={meal.desc} big />
           {meal.desc && <p className="detail-lede">{meal.desc}</p>}
           {meal.portion && (
             <div className="detail-portion">
@@ -273,54 +273,73 @@ function MealCard({
   );
 }
 
-// Dish photo, self-hosted after first view: asks the server to cache the
-// dataset image into Supabase storage and remembers the result per-session.
-// `big` renders the hero variant inside the detail popup.
-function DishImage({ imageKey, src, big = false }: { imageKey?: string | null; src?: string | null; big?: boolean }) {
+// Dish photo, self-hosted after first view: asks the server for the dish image
+// (dataset photo when available, otherwise an AI-generated one) and remembers
+// the result per-session. `big` renders the hero variant inside the popup.
+function DishImage({
+  imageKey,
+  src,
+  name,
+  desc,
+  big = false,
+}: {
+  imageKey?: string | null;
+  src?: string | null;
+  name?: string;
+  desc?: string;
+  big?: boolean;
+}) {
   const [url, setUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let on = true;
     setFailed(false);
-    if (!imageKey || !src) {
+    if (!imageKey) {
       setUrl(null);
       return;
     }
     const cacheKey = `dishimg:${imageKey}`;
     const cached = sessionStorage.getItem(cacheKey);
     if (cached) {
-      setUrl(cached);
+      setUrl(cached === "none" ? null : cached);
       return;
     }
+    setLoading(true);
     fetch("/api/plan/meal-image", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ key: imageKey, src }),
+      body: JSON.stringify({ key: imageKey, src: src ?? "", name: name ?? "", desc: desc ?? "" }),
     })
       .then((r) => r.json())
       .then((j) => {
-        const u = j?.url ?? src;
+        const u: string | null = j?.url ?? src ?? null;
         if (on) {
           setUrl(u);
           try {
-            sessionStorage.setItem(cacheKey, u);
+            sessionStorage.setItem(cacheKey, u ?? "none");
           } catch {
             /* ignore */
           }
         }
       })
-      .catch(() => on && setUrl(src));
+      .catch(() => on && setUrl(src ?? null))
+      .finally(() => on && setLoading(false));
     return () => {
       on = false;
     };
-  }, [imageKey, src]);
+  }, [imageKey, src, name, desc]);
 
   const cls = big ? "meal-hero" : "meal-img";
   if (!url || failed)
     return (
       <span className={`${cls} ph`}>
-        <Icon name="restaurant-outline" size={big ? 40 : 24} />
+        {loading ? (
+          <span className="spinner" style={{ borderTopColor: "var(--accent)", width: big ? 22 : 16, height: big ? 22 : 16 }} />
+        ) : (
+          <Icon name="restaurant-outline" size={big ? 40 : 24} />
+        )}
       </span>
     );
   // eslint-disable-next-line @next/next/no-img-element
