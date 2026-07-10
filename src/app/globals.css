@@ -9,7 +9,7 @@
      elements only), fixed macro hues — color is information here. */
   color-scheme: light;
   --canvas: #ffffff; /* cards / solid surfaces — stays white so they lift off the page */
-  --bg: #e8eef1; /* page shade: a soft cool mint-grey the liquid glass refracts against */
+  --bg: #eef2f7; /* page shade: a soft light cool tint the liquid glass refracts against */
   --surface: #eef1f4;
   --ink: #17171a;
   --ink-2: #82828a;
@@ -69,7 +69,9 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: var(--bg);
+  background:
+    radial-gradient(135% 75% at 50% -8%, rgba(255, 255, 255, 0.85), transparent 52%),
+    var(--bg);
   color: var(--ink);
   font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   font-feature-settings: "tnum" 1; /* tabular figures so numbers don't jump */
@@ -88,10 +90,10 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(44% 36% at 12% 8%, rgba(34, 197, 122, 0.26), transparent 66%),
-    radial-gradient(40% 32% at 88% 14%, rgba(240, 176, 96, 0.22), transparent 66%),
-    radial-gradient(48% 40% at 55% 94%, rgba(124, 106, 224, 0.2), transparent 66%),
-    radial-gradient(34% 28% at 72% 52%, rgba(56, 189, 248, 0.14), transparent 66%);
+    radial-gradient(46% 40% at 14% 6%, rgba(34, 197, 122, 0.34), transparent 64%),
+    radial-gradient(44% 36% at 86% 12%, rgba(124, 58, 237, 0.3), transparent 64%),
+    radial-gradient(50% 42% at 50% 98%, rgba(124, 58, 237, 0.22), transparent 64%),
+    radial-gradient(36% 30% at 78% 58%, rgba(34, 197, 122, 0.18), transparent 64%);
   animation: ambient 26s ease-in-out infinite alternate;
 }
 :root[data-mode="ai"] body::before {
@@ -2065,8 +2067,26 @@ textarea {
 }
 .topbar-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
 
-/* ---- add-bar: a prominent primary + a proper guru FAB, never clipped ---- */
-.add-bar { gap: 12px; }
+/* ---- home: header + counter + tabs scroll away; only the add-bar is fixed ---- */
+.home-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 6px 0 118px;
+}
+.home-list { padding: 14px 20px 0; }
+
+/* ---- add-bar: a solid, full-width bottom bar (not a translucent floating
+   island — the glass over the tinted page read as a cut-out card) ---- */
+.add-bar {
+  gap: 12px;
+  background: var(--canvas);
+  border-top: 1px solid var(--line);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -4px 20px rgba(16, 24, 40, 0.07);
+}
+.add-bar.glass::after { display: none; }
 .btn-add {
   min-height: 56px;
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
@@ -2120,49 +2140,64 @@ textarea {
 }
 .glass-sheet {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
-  max-width: 520px; margin: 0 auto; max-height: 92dvh; overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  border-radius: 28px 28px 0 0;
-  padding: 0 20px calc(24px + env(safe-area-inset-bottom));
+  max-width: 520px; margin: 0 auto;
+  max-height: 85dvh;
+  /* Flex column so the header stays put and ONLY the body scrolls — reliable
+     on iOS, and the sheet never grows past 85% of the screen. */
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  border-radius: 26px 26px 0 0;
   /* High-opacity frosted glass: reads as glass, keeps content crisp. */
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.97));
-  backdrop-filter: blur(30px) saturate(1.7);
-  -webkit-backdrop-filter: blur(30px) saturate(1.7);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.98));
+  backdrop-filter: blur(28px) saturate(1.7);
+  -webkit-backdrop-filter: blur(28px) saturate(1.7);
   box-shadow: 0 -14px 54px rgba(16, 24, 40, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.95);
-  animation: slideup 0.32s var(--ease);
+  /* Springy liquid-glass pop on open. */
+  animation: sheetPop 0.42s var(--spring);
+  transform-origin: 50% 100%;
+}
+@keyframes sheetPop {
+  0% { transform: translateY(24px) scale(0.98); opacity: 0; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
 }
 :root[data-mode="ai"] .glass-sheet {
-  background: linear-gradient(180deg, rgba(253, 252, 255, 0.9), rgba(253, 252, 255, 0.98));
+  background: linear-gradient(180deg, rgba(253, 252, 255, 0.92), rgba(253, 252, 255, 0.99));
 }
 .glass-sheet-head {
-  position: sticky; top: 0; z-index: 3;
-  margin: 0 -20px 12px; padding: 12px 20px 10px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.72));
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 28px 28px 0 0;
+  flex: 0 0 auto;
+  position: relative;
+  padding: 10px 20px 8px;
+  border-radius: 26px 26px 0 0;
 }
 .glass-sheet-grip {
   display: block; width: 42px; height: 5px; border-radius: 99px;
   background: rgba(0, 0, 0, 0.16); margin: 2px auto 10px;
 }
 .glass-sheet-x {
-  position: absolute; top: 12px; right: 14px;
+  position: absolute; top: 8px; right: 14px;
   width: 34px; height: 34px; border-radius: 50%;
   border: none; background: rgba(0, 0, 0, 0.06); color: var(--ink-2);
   font-size: 14px; display: grid; place-items: center;
 }
 .glass-sheet-x:active { background: rgba(0, 0, 0, 0.12); }
 .glass-sheet-title {
-  font-size: 20px; font-weight: 700; letter-spacing: -0.02em;
+  font-size: 19px; font-weight: 700; letter-spacing: -0.02em;
   padding-right: 42px; line-height: 1.25;
+}
+.glass-sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  padding: 4px 20px calc(24px + env(safe-area-inset-bottom));
 }
 .glass-sheet-body > *:first-child { margin-top: 0; }
 
 /* ---- detail content bits ---- */
 .detail-lede { margin: 10px 0 14px; font-size: 14.5px; line-height: 1.55; color: var(--ink-2); }
 .detail-photo {
-  width: 100%; max-height: 240px; object-fit: cover;
+  width: 100%; max-height: 200px; object-fit: cover;
   border-radius: 18px; border: 1px solid var(--line); margin: 4px 0 14px;
 }
 .detail-h {
@@ -2214,7 +2249,9 @@ textarea {
 .macro-table-grams i { font-style: normal; font-weight: 500; color: var(--ink-2); font-size: 11px; }
 
 /* ---- exercise how-to popup: animation hero + sets/reps/load stats ---- */
-.glass-hero { width: 100%; height: 240px; margin: 4px 0 14px; border-radius: 20px; }
+/* contain, not cover — the full exercise animation must show, uncropped. */
+.glass-hero { width: 100%; height: 208px; margin: 4px 0 14px; border-radius: 20px; }
+.glass-hero img { object-fit: contain; }
 .ex-stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 0 0 14px; }
 .ex-stat {
   background: var(--surface); border-radius: 14px; padding: 14px 8px;
@@ -2233,13 +2270,23 @@ textarea {
   border: none; background: transparent; text-align: left; padding: 0; cursor: pointer;
 }
 .meal-card-main:active:not(:disabled) { transform: scale(0.99); }
-.meal-card-text { display: flex; flex-direction: column; }
+.meal-card-text { display: flex; flex-direction: column; gap: 1px; }
 .meal-img { width: 72px; height: 72px; }
+/* Spread the four macro figures across the card so they aren't cramped. */
 .meal-macros {
-  gap: 14px; padding: 10px 12px; margin-top: 10px;
-  background: var(--surface); border-radius: 12px; font-weight: 600;
+  display: flex; justify-content: space-between; align-items: center; gap: 6px;
+  padding: 11px 14px; margin-top: 10px;
+  background: var(--surface); border-radius: 12px; font-weight: 600; font-size: 12.5px;
 }
+.meal-macros span { display: inline-flex; align-items: center; }
 .meal-macros span:first-child { color: var(--ink); font-weight: 800; }
+
+/* "No image" states read as intentional on-brand tiles, not broken images. */
+.meal-img.ph, .meal-hero.ph {
+  background: linear-gradient(135deg, var(--accent-soft), var(--surface));
+  color: var(--accent);
+}
+.meal-hero { height: 176px; }
 
 /* ---- analytics: personalised intro, body metrics, fun stats ---- */
 .an-intro { margin: 2px 2px 14px; }

@@ -58,9 +58,7 @@ export function MainApp({
   const [liveInProgress, setLiveInProgress] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const topbarRef = useRef<HTMLDivElement>(null);
-  const addbarRef = useRef<HTMLDivElement>(null);
   useLiquidGlass(topbarRef, { scale: -60, blur: 4, fallbackBlur: 14 });
-  useLiquidGlass(addbarRef, { scale: -60, blur: 4, fallbackBlur: 14 });
 
   // "Resume workout" if a live session with logged exercises is sitting in
   // localStorage (e.g. the user backed out mid-gym-session).
@@ -162,6 +160,10 @@ export function MainApp({
     <div className="app-shell">
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
 
+      {/* Everything above the bottom bar lives in one scroll area, so the
+          header, counter and tabs slide away as you scroll the list. Only the
+          add-bar is pinned. */}
+      <div className="home-scroll">
       <div className="topbar glass topbar-sticky" ref={topbarRef}>
         <div className="topbar-lead">
           {profile?.first_name && (
@@ -202,7 +204,7 @@ export function MainApp({
         </button>
       </div>
 
-      <div className="content">
+      <div className="home-list">
         <div className="datebar">
           <button onClick={() => setDate(addDays(date, -1))} aria-label="Previous day"><Icon name="chevron-back-outline" size={16} /></button>
           <span>{prettyDate(date)}</span>
@@ -234,8 +236,9 @@ export function MainApp({
           />
         )}
       </div>
+      </div>
 
-      <div className="add-bar glass" ref={addbarRef}>
+      <div className="add-bar">
         {tab === "food" ? (
           <>
             <button className="btn-add" onClick={() => setSheet(true)}>+ Add meal</button>
